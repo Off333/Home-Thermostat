@@ -1,0 +1,188 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include "pico/stdlib.h"
+#include "hardware/rtc.h"
+
+#include "lcd.h"
+#include "analog_tmp_sensor.h"
+#include "relay_driver.h"
+#include "potenciometer.h"
+#include "button_driver.h"
+
+
+/**
+ * TODO: 
+ * přidat state machine
+ * 
+ * wifi
+ *  > připojení
+ *  > ntp
+ *  > jednoduchý web server (bude aktivní pořád?)
+ *  > odpojování od wifi?
+ * 
+ * logika termostatu
+ *  > rtc alarmy
+ *  > nastavení různé teploty na různé časy
+ *   > struktura pro ukládání
+ *   > hlídání těchto časů přes alarmy
+ *    > jak lze udělat křivky? -> například granuálně po 5 minutách měnit podle grafu křivky(funkce)
+ * 
+ * menu a ovládání
+ *  > nastavení teplot
+ *  > nastavitelná hysterze temploty 
+ *  > základní nastavení
+ *  > vypnutí/zapnutí webserveru?
+ *  > úplné pozastavení monitorování teploty?
+ * 
+ * ukládání a statistika teplot
+ * 
+ * ---
+ * krabička pro termostat
+ *  > tlačítka a otočný úchyt pro potík
+ *  > obrazovka
+ *  > zapnutí/vypnutí termostatu?
+ *  > otvory pro indikační ledky?
+ * 
+ * kalibrace teploměru (teploměr na pico)
+ * 
+ * dokumentace
+ * 
+ */
+
+/* main loop sleeping after finishing in ms */
+#define MAIN_LOOP_REFRESH_TIMER 200
+
+
+/* temperature limits in °C */
+#define TEMPERATURE_SET_MIN 15
+
+#define TEMPERATURE_SET_MAX 30
+
+#define TEMPERATURE_HYSTERSIS 2
+
+#define BTN_1_GPIO 19
+#define BTN_2_GPIO 18
+#define BTN_3_GPIO 17
+#define BTN_4_GPIO 16
+
+// void lcd_reset() {
+//     lcd_display_enable(true);
+//     lcd_clear();
+//     display_timer = DISPLAY_ON_TIMER+(MAIN_LOOP_REFRESH_TIMER/1000);
+// }
+
+void wake_up() {
+    //lcd_reset();
+    lcd_refresh_on_timer();
+}
+
+void lcd_show_temp_data(uint16_t temp, float temp_treshold) {
+    char temp_str[6];
+    char write_str[17];
+
+    if(temp >= 0 && temp < 1000) {
+        convert_temp_to_str(temp, temp_str);
+        sniprintf(write_str, 16, "T. namer: %s", temp_str);
+        lcd_write(write_str, LCD_LINE_1);         
+    }
+
+    if(temp_treshold >= TEMPERATURE_SET_MIN && temp_treshold <= TEMPERATURE_SET_MAX) {
+        sprintf(write_str, "T.  udrz: %2.1f", temp_treshold);
+        lcd_write(write_str, LCD_LINE_2);
+    }
+}
+
+uint16_t get_temp_data() {
+    return get_temp();
+}
+
+float get_temp_treshold() {
+    return TEMPERATURE_SET_MIN + (TEMPERATURE_SET_MAX-TEMPERATURE_SET_MIN)*((100-get_pot_val())/100.0f);
+}
+
+/* set temperature will be center of hystersis curve */
+void check_relay_state(float current_temp, float set_temp) {    
+    if(current_temp > set_temp + TEMPERATURE_HYSTERSIS/2) {
+        relay_off();
+    } else if(current_temp < set_temp - TEMPERATURE_HYSTERSIS/2) {
+        relay_on();
+    }
+}
+
+int main() {
+    
+    //busy_wait_ms(2000);
+    printf("initialization...\n");
+
+    stdio_init_all();
+
+    if(temp_sensor_init()) {
+        printf("temp sensor init failed!");
+        return 1;
+    }
+
+    if(pot_init()) {
+        printf("potenciometer init failed!");
+        return 1;
+    }
+
+    rtc_init();
+
+    //TODO tohle nahradí načtení času z ntp... možná zde tohle nechám a ntp nastaví čas správně později
+    datetime_t t = {
+            .year  = 2024,
+            .month = 10,
+            .day   = 14,
+            .dotw  = 1, // 0 is Sunday, so 5 is Friday
+            .hour  = 1,
+            .min   = 18,
+            .sec   = 00
+    };
+
+    rtc_set_datetime(&t);
+    sleep_us(64); // waiting for rtc to update
+
+    // takhle se používá rtc:
+    // char datetime_buf[256];
+    // char *datetime_str = &datetime_buf[0];
+    // rtc_get_datetime(&t);
+    // datetime_to_str(datetime_str, sizeof(datetime_buf), &t);
+
+    relay_init();
+
+    if(lcd_init()) {
+        printf("lcd init failed!");
+        return 1;
+    }
+    lcd_string("Hello, world!");
+
+    btn_set_common_function(&wake_up);
+    init_btn_rising_edge(BTN_1_GPIO, NULL);
+    init_btn_rising_edge(BTN_2_GPIO, NULL);
+    init_btn_rising_edge(BTN_3_GPIO, NULL);
+    init_btn_rising_edge(BTN_4_GPIO, NULL);
+
+    //sleep_ms(1000);
+    lcd_clear();
+    printf("initialization done!");
+
+    while (true) {
+        check_relay_state(convert_temp_to_float(get_temp_data()), get_temp_treshold());
+
+        lcd_show_temp_data(get_temp_data(), get_temp_treshold());
+
+        //zobrazování na displeji
+        // if(display_timer > 0)  {
+        //     lcd_show_temp_data(temp, temp_treshold);
+        //     display_timer -= MAIN_LOOP_REFRESH_TIMER/1000;
+        // }
+        
+        // if(display_timer == 0) {
+        //     lcd_display_enable(false);
+        // }
+
+        printf("main loop end\n");
+        sleep_ms(MAIN_LOOP_REFRESH_TIMER);
+
+    }
+}
