@@ -69,6 +69,7 @@ target_link_libraries(Thermostat
         hardware_sync
         pico_sync
         pico_cyw43_arch_lwip_threadsafe_background
+        pico_util
         )
 
 
