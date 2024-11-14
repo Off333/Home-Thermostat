@@ -73,10 +73,7 @@ static int addr = 0x27;
 #define LCD_CHARACTER  1
 #define LCD_COMMAND    0
 
-#define MAX_LINES      2
-#define MAX_CHARS      16
-
-typedef char lcd_message_t[MAX_LINES][MAX_CHARS+1];
+typedef char lcd_message_t[LCD_MAX_LINES][LCD_MAX_CHARS+1];
 
 lcd_message_t lcd_buffered_string;
 
@@ -148,9 +145,9 @@ void lcd_display_enable(bool enable) {
 }
 
 void lcd_write(const char *s, uint line) {
-    if(line < 0 || line > 1) return;
+    if(line < 0 || line >= LCD_MAX_LINES) return;
     critical_section_enter_blocking(&write_cs);
-    snprintf(lcd_buffered_string[line], 16, "%s", s);
+    snprintf(lcd_buffered_string[line], LCD_MAX_CHARS, "%s", s);
     critical_section_exit(&write_cs);
     
 }

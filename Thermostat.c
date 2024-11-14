@@ -27,6 +27,9 @@
 #define BTN_3_GPIO 17
 #define BTN_4_GPIO 16
 
+#define MENU_LINE LCD_LINE_1
+#define STATUS_LINE LCD_LINE_2
+
 typedef enum {
     S_SLEEP,
     S_SHOW_TIME,
@@ -64,6 +67,18 @@ void wake_up() {
     lcd_refresh_on_timer();
 }
 
+void show_menu(state_t state) {
+    char menu_str[LCD_MAX_CHARS+1] = {0};
+    switch(state) {
+        case S_SHOW_TIME:
+            snprintf(menu_str, LCD_MAX_CHARS, "<nast|cas|prog>");
+            break;
+        default:
+            break;
+    }
+    lcd_write(menu_str, MENU_LINE);
+}
+
 // takhle se používá rtc:
 // char datetime_buf[256];
 // char *datetime_str = &datetime_buf[0];
@@ -71,7 +86,7 @@ void wake_up() {
 // datetime_to_str(datetime_str, sizeof(datetime_buf), &t);
 
 void show_time() {
-    static char datetime_buf[17];
+    static char datetime_buf[LCD_MAX_CHARS+1];
     static char *datetime_str = &datetime_buf[0];
     static datetime_t dt;
     static time_t t;
@@ -80,7 +95,7 @@ void show_time() {
     datetime_to_time(&dt, &t);
     struct tm* time_struct = localtime(&t);
     strftime(datetime_str, sizeof(datetime_buf), "%H:%M %d.%m.%y", time_struct);
-    lcd_write(datetime_str, LCD_LINE_1);
+    lcd_write(datetime_str, STATUS_LINE);
     printf("showing time: %s\n", datetime_str);
 }
 
@@ -131,6 +146,7 @@ void main_loop_logic(state_t state) {
         default:
             break;
     }
+    show_menu(state);
 }
 
 state_t main_loop_step() {

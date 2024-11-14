@@ -10,6 +10,9 @@
 #define LCD_LINE_1 0
 #define LCD_LINE_2 1
 
+#define LCD_MAX_LINES      2
+#define LCD_MAX_CHARS      16
+
 void lcd_clear(void);
 
 // go to location on LCD
