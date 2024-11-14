@@ -12,7 +12,7 @@
 #include "button_driver.h"
 
 /* main loop sleeping after finishing in ms */
-#define MAIN_LOOP_REFRESH_TIMER 500
+#define MAIN_LOOP_REFRESH_TIMER 200
 
 
 /* temperature limits in °C */
@@ -20,7 +20,7 @@
 
 #define TEMPERATURE_SET_MAX 30
 
-#define TEMPERATURE_HYSTERSIS 2
+#define DEFAULT_TEMPERATURE_HYSTERSIS 2
 
 #define BTN_1_GPIO 19
 #define BTN_2_GPIO 18
@@ -42,19 +42,22 @@ typedef enum {
     S_PROG_TEMP_SET,
     S_SETN_TIME,
     S_SETN_HYST,
-    S_SETN_OFF
+    S_SETN_OFF,
+    STATE_T_MAX
 } state_t;
 
 typedef enum {
-    NS_NONE,
-    NS_LEFT,
-    NS_RIGHT,
-    NS_ENTER,
-    NS_ESC
+    NA_NONE,
+    NA_LEFT,
+    NA_RIGHT,
+    NA_ENTER,
+    NA_ESC,
+    NEXT_ACTION_T_MAX
 } next_action_t;
 
 #define DEFAULT_STATE S_SHOW_TIME
-next_action_t next_action = NS_NONE;
+#define DEFAULT_NEXT_ACTION NA_NONE
+next_action_t next_action = DEFAULT_NEXT_ACTION;
 
 // void lcd_reset() {
 //     lcd_display_enable(true);
@@ -62,21 +65,49 @@ next_action_t next_action = NS_NONE;
 //     display_timer = DISPLAY_ON_TIMER+(MAIN_LOOP_REFRESH_TIMER/1000);
 // }
 
+/* callback functions for buttons */
 void wake_up() {
     //lcd_reset();
     lcd_refresh_on_timer();
 }
 
+void btn_left() {
+    next_action = NA_LEFT;
+}
+
+void btn_right() {
+    next_action = NA_RIGHT;
+}
+
+void btn_enter() {
+    next_action = NA_ENTER;
+}
+
+void btn_cancel() {
+    next_action = NA_ESC;
+}
+
+/* */
+
 void show_menu(state_t state) {
-    char menu_str[LCD_MAX_CHARS+1] = {0};
-    switch(state) {
-        case S_SHOW_TIME:
-            snprintf(menu_str, LCD_MAX_CHARS, "<nast|cas|prog>");
-            break;
-        default:
-            break;
-    }
-    lcd_write(menu_str, MENU_LINE);
+    if(state < 0 || state >= STATE_T_MAX) return;
+
+    static const char menu_texts[][LCD_MAX_CHARS+1] = {
+        "",  //S_SLEEP
+        "<nast|cas|tepl>",  //S_SHOW_TIME
+        "<cas|tepl|prog>",  //S_SHOW_TEMP
+        "<tep|prog|nast>",  //S_SHOW_PROGS
+        "<prog|nast|cas>",  //S_SHOW_SETN
+        "<#1 >#2 o#3 x#4",  //S_PROG_SEL
+        "",  //S_PROG_TIME_SET
+        "",  //S_PROG_WEEKDAY_SET
+        "",  //S_PROG_TEMP_SET
+        "zmenit cas     ",  //S_SETN_TIME
+        "zmenit hysterzi",  //S_SETN_HYST
+        "udrzovat teplo "   //S_SETN_OFF
+    };
+    
+    lcd_write(menu_texts[state], MENU_LINE);
 }
 
 // takhle se používá rtc:
@@ -125,9 +156,9 @@ float get_temp_treshold() {
 
 /* set temperature will be center of hystersis curve */
 void check_relay_state(float current_temp, float set_temp) {    
-    if(current_temp > set_temp + TEMPERATURE_HYSTERSIS/2) {
+    if(current_temp > set_temp + DEFAULT_TEMPERATURE_HYSTERSIS/2) {
         relay_off();
-    } else if(current_temp < set_temp - TEMPERATURE_HYSTERSIS/2) {
+    } else if(current_temp < set_temp - DEFAULT_TEMPERATURE_HYSTERSIS/2) {
         relay_on();
     }
 }
@@ -149,46 +180,30 @@ void main_loop_logic(state_t state) {
     show_menu(state);
 }
 
-state_t main_loop_step() {
+state_t main_loop_step(state_t state) {
 
-    static state_t state = DEFAULT_STATE;
-
-    state_t next_state = state;
-
-    switch(state) {
-        case S_SHOW_TIME:
-            switch(next_action) {
-                case NS_LEFT:
-                    break;
-                case NS_RIGHT:
-                    break;
-                case NS_ENTER:
-                    break;
-                case NS_ESC:
-                    break;
-                case NS_NONE:
-                    break;
-            }
-            break;
-        default:
-            switch(next_action) {
-                case NS_LEFT:
-                    break;
-                case NS_RIGHT:
-                    break;
-                case NS_ENTER:
-                    break;
-                case NS_ESC:
-                    break;
-                case NS_NONE:
-                    break;
-            }
-            break;
-    }
-
+    static const state_t state_table[STATE_T_MAX][NEXT_ACTION_T_MAX] = {
+    /*                      {NA_NONE,               NA_LEFT,        NA_RIGHT,       NA_ENTER,       NA_ESC}*/
+    /*S_SLEEP*/             {S_SLEEP,               S_SHOW_TIME,    S_SHOW_TIME,    S_SHOW_TIME,    S_SHOW_TIME},
+    /*S_SHOW_TIME*/         {S_SHOW_TIME,           S_SHOW_SETN,    S_SHOW_TEMP,    S_SHOW_TIME,    S_SLEEP},
+    /*S_SHOW_TEMP*/         {S_SHOW_TEMP,           S_SHOW_TIME,    S_SHOW_PROGS,   S_SHOW_TEMP,    S_SLEEP},
+    /*S_SHOW_PROGS*/        {S_SHOW_PROGS,          S_SHOW_TEMP,    S_SHOW_SETN,    S_SHOW_PROGS,   S_SLEEP},
+    /*S_SHOW_SETN*/         {S_SHOW_SETN,           S_SHOW_PROGS,   S_SHOW_TIME,    S_SHOW_SETN,    S_SLEEP},
+    /*S_PROG_SEL*/          {S_PROG_SEL,            S_SLEEP,        S_SLEEP,        S_SLEEP,        S_SLEEP},
+    /*S_PROG_TIME_SET*/     {S_PROG_TIME_SET,       S_SLEEP,        S_SLEEP,        S_SLEEP,        S_SLEEP},
+    /*S_PROG_WEEKDAY_SET*/  {S_PROG_WEEKDAY_SET,    S_SLEEP,        S_SLEEP,        S_SLEEP,        S_SLEEP},
+    /*S_PROG_TEMP_SET*/     {S_PROG_TEMP_SET,       S_SLEEP,        S_SLEEP,        S_SLEEP,        S_SLEEP},
+    /*S_SETN_TIME*/         {S_SETN_TIME,           S_SLEEP,        S_SLEEP,        S_SLEEP,        S_SLEEP},
+    /*S_SETN_HYST*/         {S_SETN_HYST,           S_SLEEP,        S_SLEEP,        S_SLEEP,        S_SLEEP},
+    /*S_SETN_OFF*/          {S_SETN_OFF,            S_SLEEP,        S_SLEEP,        S_SLEEP,        S_SLEEP} 
+    };
+    state_t next_state = state_table[state][next_action];
+    printf("stavy: %d %d %d\n", state, next_state, next_action);
+    next_action = NA_NONE;
 
     if(state == next_state) {
-        //timer pro uspání MCU?
+        //dekrement sleep timer
+        //if sleep timer <= 0 goto sleep
     }
     state = next_state;
     return state;
@@ -236,19 +251,20 @@ int main() {
     lcd_string("Hello, world!");
 
     btn_set_common_function(&wake_up);
-    init_btn_rising_edge(BTN_1_GPIO, NULL);
-    init_btn_rising_edge(BTN_2_GPIO, NULL);
-    init_btn_rising_edge(BTN_3_GPIO, NULL);
-    init_btn_rising_edge(BTN_4_GPIO, NULL);
+    init_btn_rising_edge(BTN_1_GPIO, &btn_left);
+    init_btn_rising_edge(BTN_2_GPIO, &btn_right);
+    init_btn_rising_edge(BTN_3_GPIO, &btn_enter);
+    init_btn_rising_edge(BTN_4_GPIO, &btn_cancel);
 
-    //sleep_ms(1000);
+    sleep_ms(1000);
     lcd_clear();
     printf("initialization done!");
 
     state_t state = DEFAULT_STATE;
+    next_action = DEFAULT_NEXT_ACTION;
     while (true) {
         
-        state = main_loop_step();
+        state = main_loop_step(state);
 
         main_loop_logic(state);
 
