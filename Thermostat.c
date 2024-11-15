@@ -146,13 +146,6 @@ void show_menu(state_t state) {
 }
 
 /* --- PRINTING STATUS --- */
-
-// takhle se používá rtc:
-// char datetime_buf[256];
-// char *datetime_str = &datetime_buf[0];
-// rtc_get_datetime(&t);
-// datetime_to_str(datetime_str, sizeof(datetime_buf), &t);
-
 void show_time() {
     static char datetime_buf[LCD_MAX_CHARS+1];
     static char *datetime_str = &datetime_buf[0];

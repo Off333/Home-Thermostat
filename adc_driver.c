@@ -7,13 +7,15 @@
  * Description:
  * 
 */
-#include <stdio.h>
 #include <stdlib.h>
+
 #include "pico/stdlib.h"
 #include "hardware/sync.h"
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
 
+#define DEBUG 1
+#include "debug.h"
 #include "adc_driver.h"
 
 
@@ -51,7 +53,7 @@ int adc_driver_init(adc_data *data) {
     if(timer == NULL) return 1;
 
     if(!add_repeating_timer_ms(-READING_INTERVAL, *reading_callback, data, timer)) {
-        printf("failed to add repeating timer - adc\n");
+        debug("failed to add repeating timer - adc\n", "");
         return 1;
     }
     return 0;
