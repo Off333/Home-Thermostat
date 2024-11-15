@@ -1,3 +1,12 @@
+/**
+ * adc_driver.h
+ * Autor: Ondřej Fojt (fojt.ondrej@seznam.cz)
+ * Projekt: Home Thermostat
+ */
+/**
+ * Description:
+ * 
+*/
 #ifndef ADC_H
 #define ADC_H
 

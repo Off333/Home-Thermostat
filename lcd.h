@@ -1,3 +1,12 @@
+/**
+ * lcd.h
+ * Autor: Ondřej Fojt (fojt.ondrej@seznam.cz)
+ * Projekt: Home Thermostat
+ */
+/**
+ * Description:
+ * 
+*/
 #ifndef LCD_H
 #define LCD_H
 

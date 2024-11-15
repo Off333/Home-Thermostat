@@ -3,6 +3,16 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
+/**
+ * lcd.c
+ * Original at: https://github.com/raspberrypi/pico-examples/tree/master/i2c/lcd_1602_i2c
+ * Modified by: Ondřej Fojt (fojt.ondrej@seznam.cz)
+ * Projekt: Home Thermostat
+ */
+/**
+ * Description:
+ * 
+*/
 
 #include <stdio.h>
 #include "pico/stdlib.h"

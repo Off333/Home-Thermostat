@@ -1,4 +1,12 @@
-
+/**
+ * button_driver.c
+ * Autor: Ondřej Fojt (fojt.ondrej@seznam.cz)
+ * Projekt: Home Thermostat
+ */
+/**
+ * Description:
+ * 
+*/
 #include "button_driver.h"
 
 #include "pico/stdlib.h"   

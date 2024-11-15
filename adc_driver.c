@@ -1,4 +1,12 @@
-
+/**
+ * adc_driver.c
+ * Autor: Ondřej Fojt (fojt.ondrej@seznam.cz)
+ * Projekt: Home Thermostat
+ */
+/**
+ * Description:
+ * 
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include "pico/stdlib.h"

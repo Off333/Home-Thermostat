@@ -1,3 +1,12 @@
+/**
+ * relay_driver.h
+ * Autor: Ondřej Fojt (fojt.ondrej@seznam.cz)
+ * Projekt: Home Thermostat
+ */
+/**
+ * Description:
+ * 
+*/
 #ifndef RELAY_DRIVER_H
 #define RELAY_DRIVER_H
 

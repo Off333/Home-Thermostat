@@ -1,4 +1,12 @@
-
+/**
+ * analog_tmp_sensor.c
+ * Autor: Ondřej Fojt (fojt.ondrej@seznam.cz)
+ * Projekt: Home Thermostat
+ */
+/**
+ * Description:
+ * 
+*/
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/adc.h"

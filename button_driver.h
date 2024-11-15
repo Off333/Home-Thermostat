@@ -1,3 +1,12 @@
+/**
+ * button_driver.h
+ * Autor: Ondřej Fojt (fojt.ondrej@seznam.cz)
+ * Projekt: Home Thermostat
+ */
+/**
+ * Description:
+ * 
+*/
 #ifndef BUTTON_DRIVER_H
 #define BUTTON_DRIVER_H
 

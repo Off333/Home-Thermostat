@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-set(HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/lcd.h ${CMAKE_CURRENT_SOURCE_DIR}/analog_tmp_sensor.h ${CMAKE_CURRENT_SOURCE_DIR}/relay_driver.h ${CMAKE_CURRENT_SOURCE_DIR}/adc_driver.h ${CMAKE_CURRENT_SOURCE_DIR}/potenciometer.h ${CMAKE_CURRENT_SOURCE_DIR}/wifi_driver.h ${CMAKE_CURRENT_SOURCE_DIR}/button_driver.h)
+set(HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/lcd.h ${CMAKE_CURRENT_SOURCE_DIR}/analog_tmp_sensor.h ${CMAKE_CURRENT_SOURCE_DIR}/relay_driver.h ${CMAKE_CURRENT_SOURCE_DIR}/adc_driver.h ${CMAKE_CURRENT_SOURCE_DIR}/potenciometer.h ${CMAKE_CURRENT_SOURCE_DIR}/wifi_driver.h ${CMAKE_CURRENT_SOURCE_DIR}/button_driver.h ${CMAKE_CURRENT_SOURCE_DIR}/debug.h)
 
 set(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/Thermostat.c ${CMAKE_CURRENT_SOURCE_DIR}/lcd.c ${CMAKE_CURRENT_SOURCE_DIR}/analog_tmp_sensor.c ${CMAKE_CURRENT_SOURCE_DIR}/relay_driver.c ${CMAKE_CURRENT_SOURCE_DIR}/adc_driver.c ${CMAKE_CURRENT_SOURCE_DIR}/potenciometer.c ${CMAKE_CURRENT_SOURCE_DIR}/wifi_driver.c ${CMAKE_CURRENT_SOURCE_DIR}/button_driver.c)
 

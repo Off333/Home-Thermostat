@@ -1,3 +1,12 @@
+/**
+ * potenciometer.h
+ * Autor: Ondřej Fojt (fojt.ondrej@seznam.cz)
+ * Projekt: Home Thermostat
+ */
+/**
+ * Description:
+ * 
+*/
 #ifndef POTENCIOMETER_H
 #define POTENCIOMETER_H
 

@@ -1,5 +1,12 @@
-// #include <stdio.h>
-// #include "pico/stdlib.h"
+/**
+ * relay_driver.c
+ * Autor: Ondřej Fojt (fojt.ondrej@seznam.cz)
+ * Projekt: Home Thermostat
+ */
+/**
+ * Description:
+ * 
+*/
 #include "hardware/gpio.h"
 
 #include "relay_driver.h"

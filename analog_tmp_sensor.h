@@ -1,3 +1,12 @@
+/**
+ * analog_tmp_sensor.h
+ * Autor: Ondřej Fojt (fojt.ondrej@seznam.cz)
+ * Projekt: Home Thermostat
+ */
+/**
+ * Description:
+ * 
+*/
 #ifndef ANALOG_TMP_SENSOR_H
 #define ANALOG_TMP_SENSOR_H
 

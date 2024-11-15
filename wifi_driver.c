@@ -1,4 +1,12 @@
-
+/**
+ * wifi_driver.c
+ * Autor: Ondřej Fojt (fojt.ondrej@seznam.cz)
+ * Projekt: Home Thermostat
+ */
+/**
+ * Description:
+ * 
+*/
 #include "pico/cyw43_arch.h"
 
 #include "wifi_driver.h"
