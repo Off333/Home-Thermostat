@@ -1,6 +1,6 @@
 **TODO**: 
 
-přidat state machine
+✓ přidat state machine
 
 wifi
  - připojení
@@ -20,7 +20,7 @@ menu a ovládání
  - nastavitelná hysterze temploty 
  - základní nastavení
  - vypnutí/zapnutí webserveru?
- - úplné pozastavení monitorování teploty?
+ - úplné pozastavení hlídání teploty?
 
 ukládání a statistika teplot
 
@@ -32,9 +32,9 @@ krabička pro termostat
 
 kalibrace teploměru (teploměr na pico)
 
-vypnutí potenciometru když není potřeba
+vypnutí potenciometru, když není potřeba
 
-dokumentace
+dokumentace <!-- <-this -->
 
 Relevantní odkazy:
  - https://forums.raspberrypi.com/viewtopic.php?t=339289

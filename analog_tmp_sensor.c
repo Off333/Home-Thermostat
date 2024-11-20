@@ -38,6 +38,8 @@ adc_data temp_data = {
     .sample_number = 10
 };
 
+/* converts 10x temperature in C to string 
+format: %3.1f */
 void convert_temp_to_str(uint16_t temp, char* str) {
     snprintf(str, 5, "%3.1f", ((float)temp)/10);
 }

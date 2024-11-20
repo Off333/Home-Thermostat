@@ -22,7 +22,9 @@
 #define LCD_MAX_LINES      2
 #define LCD_MAX_CHARS      16
 
-void lcd_clear(void);
+void lcd_clear();
+
+void lcd_sleep();
 
 // go to location on LCD
 void lcd_set_cursor(int line, int position);

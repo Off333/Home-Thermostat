@@ -157,7 +157,7 @@ void lcd_display_enable(bool enable) {
 void lcd_write(const char *s, uint line) {
     if(line < 0 || line >= LCD_MAX_LINES) return;
     critical_section_enter_blocking(&write_cs);
-    snprintf(lcd_buffered_string[line], LCD_MAX_CHARS, "%s", s);
+    snprintf(lcd_buffered_string[line], LCD_MAX_CHARS+1, "%s", s);
     critical_section_exit(&write_cs);
     
 }
@@ -184,6 +184,10 @@ void lcd_rtc_callback() {
     lcd_display_enable(false);
 }
 
+void lcd_sleep() {
+    lcd_rtc_callback();
+}
+
 void calculate_and_add_time_to_rtc_alarm() {
     rtc_disable_alarm();
     rtc_get_datetime(&t);
@@ -191,6 +195,7 @@ void calculate_and_add_time_to_rtc_alarm() {
     rtc_set_alarm(&t, &lcd_rtc_callback);
 }
 
+//někde v této funkci je chyba... minimálně datarace, protože se jednou stalo, že se displej nevypnul
 int lcd_refresh_on_timer() {
     calculate_and_add_time_to_rtc_alarm();
     if(!timer_running) {
