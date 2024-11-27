@@ -56,10 +56,10 @@
 /* states */
 typedef enum {
     S_SLEEP,
-    S_SHOW_TIME,
-    S_SHOW_TEMP,
-    S_SHOW_PROGS,
-    S_SHOW_SETN,
+    S_MENU_TIME,
+    S_MENU_TEMP,
+    S_MENU_PROGS,
+    S_MENU_SETN,
     S_PROG_SEL,
     S_PROG_TIME_SET,
     S_PROG_WEEKDAY_SET,
@@ -79,7 +79,7 @@ typedef enum {
 } next_action_t;
 
 /* deafults */
-#define DEFAULT_STATE       S_SHOW_TIME
+#define DEFAULT_STATE       S_MENU_TIME
 #define DEFAULT_NEXT_ACTION NA_NONE
 
 #define VALUE_DOWN -1
@@ -94,38 +94,66 @@ state_t         changing_var_at_state   = S_SLEEP;
 static const state_t state_table[STATE_T_MAX][NEXT_ACTION_T_MAX] = {
 /*                      {NA_NONE,               NA_LEFT,            NA_RIGHT,           NA_ENTER,           NA_ESC}*/
 /*S_SLEEP*/             {S_SLEEP,               DEFAULT_STATE,      DEFAULT_STATE,      DEFAULT_STATE,      DEFAULT_STATE},
-/*S_SHOW_TIME*/         {S_SHOW_TIME,           S_SHOW_SETN,        S_SHOW_TEMP,        S_SHOW_TIME,        S_SLEEP},
-/*S_SHOW_TEMP*/         {S_SHOW_TEMP,           S_SHOW_TIME,        S_SHOW_PROGS,       S_SHOW_TEMP,        S_SLEEP},
-/*S_SHOW_PROGS*/        {S_SHOW_PROGS,          S_SHOW_TEMP,        S_SHOW_SETN,        S_PROG_SEL,         S_SLEEP},
-/*S_SHOW_SETN*/         {S_SHOW_SETN,           S_SHOW_PROGS,       S_SHOW_TIME,        S_SETN_TIME,        S_SLEEP},
-/*S_PROG_SEL*/          {S_PROG_SEL,            S_PROG_SEL,         S_PROG_SEL,         S_PROG_TIME_SET,    S_SHOW_PROGS},
+/*S_MENU_TIME*/         {S_MENU_TIME,           S_MENU_SETN,        S_MENU_TEMP,        S_MENU_TIME,        S_SLEEP},
+/*S_MENU_TEMP*/         {S_MENU_TEMP,           S_MENU_TIME,        S_MENU_PROGS,       S_MENU_TEMP,        S_SLEEP},
+/*S_MENU_PROGS*/        {S_MENU_PROGS,          S_MENU_TEMP,        S_MENU_SETN,        S_PROG_SEL,         S_SLEEP},
+/*S_MENU_SETN*/         {S_MENU_SETN,           S_MENU_PROGS,       S_MENU_TIME,        S_SETN_TIME,        S_SLEEP},
+/*S_PROG_SEL*/          {S_PROG_SEL,            S_PROG_SEL,         S_PROG_SEL,         S_PROG_TIME_SET,    S_MENU_PROGS},
 /*S_PROG_TIME_SET*/     {S_PROG_TIME_SET,       S_PROG_TEMP_SET,    S_PROG_WEEKDAY_SET, S_VAR_CHANGE,       S_PROG_SEL},
 /*S_PROG_WEEKDAY_SET*/  {S_PROG_WEEKDAY_SET,    S_PROG_TIME_SET,    S_PROG_TEMP_SET,    S_VAR_CHANGE,       S_PROG_SEL},
 /*S_PROG_TEMP_SET*/     {S_PROG_TEMP_SET,       S_PROG_WEEKDAY_SET, S_PROG_TIME_SET,    S_VAR_CHANGE,       S_PROG_SEL},
-/*S_SETN_TIME*/         {S_SETN_TIME,           S_SETN_OFF,         S_SETN_HYST,        S_VAR_CHANGE,       S_SHOW_SETN},
-/*S_SETN_HYST*/         {S_SETN_HYST,           S_SETN_TIME,        S_SETN_OFF,         S_VAR_CHANGE,       S_SHOW_SETN},
-/*S_SETN_OFF*/          {S_SETN_OFF,            S_SETN_HYST,        S_SETN_TIME,        S_VAR_CHANGE,       S_SHOW_SETN},
+/*S_SETN_TIME*/         {S_SETN_TIME,           S_SETN_OFF,         S_SETN_HYST,        S_VAR_CHANGE,       S_MENU_SETN},
+/*S_SETN_HYST*/         {S_SETN_HYST,           S_SETN_TIME,        S_SETN_OFF,         S_VAR_CHANGE,       S_MENU_SETN},
+/*S_SETN_OFF*/          {S_SETN_OFF,            S_SETN_HYST,        S_SETN_TIME,        S_VAR_CHANGE,       S_MENU_SETN},
 /*S_VAR_CHANGE*/        {S_VAR_CHANGE,          S_VAR_CHANGE,       S_VAR_CHANGE,       S_VAR_CHANGE,       DEFAULT_STATE}, //místo default state se změní stav na předchozí, který se měnil ( je uložený v chaning_var_at_state)
 };
 
 /* menu text */
 static const char menu_texts[][LCD_MAX_CHARS+1] = {
-        "               ",  //S_SLEEP
-        "<nast|cas |tepl>",  //S_SHOW_TIME
-        "<cas |tepl|prog>",  //S_SHOW_TEMP
-        "<tepl|prog|nast>",  //S_SHOW_PROGS
-        "<prog|nast| cas>",  //S_SHOW_SETN
-        "<#1 >#2 ok#3 x#4",  //S_PROG_SEL
-        "zmenit cas      ",  //S_PROG_TIME_SET
-        "zmenit dny      ",  //S_PROG_WEEKDAY_SET
-        "zmenit teplotu  ",  //S_PROG_TEMP_SET
+
+#ifndef LANG_EN
+        "                ",  //S_SLEEP
+        "<nast|cas |tepl>",  //S_MENU_TIME
+        "<cas |tepl|prog>",  //S_MENU_TEMP
+        "<tepl|prog|nast>",  //S_MENU_PROGS
+        "<prog|nast| cas>",  //S_MENU_SETN
+        "vyber programu  ",  //S_PROG_SEL
+        "zacatek-konec   ",  //S_PROG_TIME_SET
+        "aktivni dny     ",  //S_PROG_WEEKDAY_SET
+        "udrzovat teplotu",  //S_PROG_TEMP_SET
         "zmenit cas      ",  //S_SETN_TIME
         "zmenit hysterzi ",  //S_SETN_HYST
-        "udrzovat teplo? ",  //S_SETN_OFF
-        ""                  //S_VAR_CHANGE - special use for empty string to not replace previus value
+        "udrzovani teplot",  //S_SETN_OFF
+        ""                   //S_VAR_CHANGE - special use for empty string to not replace previus value
+#else
+        "                ",  //S_SLEEP
+        "<setn|time|temp>",  //S_MENU_TIME
+        "<time|temp|prog>",  //S_MENU_TEMP
+        "<temp|prog|setn>",  //S_MENU_PROGS
+        "<prog|setn|time>",  //S_MENU_SETN
+        "progam selection",  //S_PROG_SEL
+        "start-end time  ",  //S_PROG_TIME_SET
+        "set days        ",  //S_PROG_WEEKDAY_SET
+        "set temperature ",  //S_PROG_TEMP_SET
+        "set device time ",  //S_SETN_TIME
+        "set hystersia   ",  //S_SETN_HYST
+        "regulate temps. ",  //S_SETN_OFF
+        ""                   //S_VAR_CHANGE - special use for empty string to not replace previus value
+#endif
     };
 
 /* --- THERMOSTAT SETTINGS --- */
+
+typedef enum {
+    SETN_TIME_MODE_SHOW,
+    SETN_TIME_MODE_SET_HOUR,
+    SETN_TIME_MODE_SET_MIN,
+    SETN_TIME_MODE_SET_DAY,
+    SETN_TIME_MODE_SET_MONTH,
+    SETN_TIME_MODE_SET_YEAR,
+
+    SETN_TIME_MODE_MAX
+} setn_time_mode;
 
 /**
  * @typedef thermo_settings_t
@@ -135,14 +163,74 @@ static const char menu_texts[][LCD_MAX_CHARS+1] = {
 typedef struct{
     bool temp_regulation_on;
     uint16_t hystersia;
+
+    setn_time_mode STM; //special variable for showing which part of time in settings is changing
 } thermo_settings_t;
 
 //default settings
 thermo_settings_t th_set = {
     .temp_regulation_on = true,
-    .hystersia = DEFAULT_TEMPERATURE_HYSTERSIS
+    .hystersia = DEFAULT_TEMPERATURE_HYSTERSIS,
+    .STM = SETN_TIME_MODE_SHOW
 };
 //*time is stored in RTC
+
+typedef enum {
+    PROG_TIME_MODE_SHOW,
+    PROG_TIME_MODE_SET_HOUR_START,
+    PROG_TIME_MODE_SET_MIN_START,
+    PROG_TIME_MODE_SET_HOUR_END,
+    PROG_TIME_MODE_SET_MIN_END,
+
+    PROG_TIME_MODE_MAX
+} program_time_mode;
+
+#define MONDAY      0b00000001
+#define TUESDAY     0b00000010
+#define WEDNESDAY   0b00000100
+#define THURSDAY    0b00001000
+#define FRIDAY      0b00010000
+#define SATURDAY    0b00100000
+#define SUNDAY      0b01000000
+#define WORK_DAY    (MONDAY | TUESDAY | WEDNESDAY | THURSDAY | FRIDAY)
+#define WEEKEND     (SATURDAY | SUNDAY)
+#define WEEK        (MONDAY | TUESDAY | WEDNESDAY | THURSDAY | FRIDAY | SATURDAY | SUNDAY)
+#define NEVER       0b00000000
+
+/* --- PROGRAMS STRUCUTRE --- */
+
+/**
+ * @typedef program_t
+ */
+typedef struct{
+    datetime_t  start;
+    datetime_t  end;
+    uint16_t    temp;
+    uint8_t     days;
+    uint8_t     enabled;
+    
+    program_time_mode PTM; //special variable for showing which part of time in program is changing
+} program_t;
+
+#define NUMBER_OF_PROGRAMS 14
+
+program_t programs[NUMBER_OF_PROGRAMS]; // @todo inicialize the structures before main loop
+uint16_t selected_program = 0;
+
+/* --- HELPER FUNCTIONS --- */
+
+void convert_datetime_to_str(char *str, size_t buf_size, const char *fmt, datetime_t *dt) {
+    static time_t t;
+    datetime_to_time(dt, &t);
+    struct tm* time_struct = localtime(&t);
+    strftime(str, buf_size, fmt, time_struct);
+}
+
+#define is_prog_enabled(prog_num) (programs[prog_num].days != NEVER)
+// bool is_prog_enabled(uint16_t prog_num) {
+//     return programs[prog_num].days != NEVER;
+// }
+
 
 /* --- CALLBACKS --- */
 void wake_up() {
@@ -192,71 +280,267 @@ void show_menu(state_t state) {
 }
 
 /* --- PRINTING STATUS --- */
-void show_time() {
+
+// formát: HH:MM DD:MM:RRRR
+// podobně jako čas u programů měnit pomocí potíku?
+void show_time(setn_time_mode mode) {
+    static const char time_fmt[SETN_TIME_MODE_MAX][17] = {
+        "%H:%M %d.%m.%Y", ">%H<:%M %d.%m.%y", "%H:>%M< %d.%m.%y", "%H:%M >%d<.%m.%y", "%H:%M %d.>%m<.%y", ":%M %d.%m.>%Y<"
+    };
     static char datetime_buf[LCD_MAX_CHARS+1];
     static char *datetime_str = &datetime_buf[0];
     static datetime_t dt;
-    static time_t t;
-
     rtc_get_datetime(&dt);
-    datetime_to_time(&dt, &t);
-    struct tm* time_struct = localtime(&t);
-    strftime(datetime_str, sizeof(datetime_buf), "%H:%M   %d.%m.%y", time_struct);
+    convert_datetime_to_str(datetime_str, sizeof(datetime_buf), time_fmt[mode], &dt);
     lcd_write(datetime_str, STATUS_LINE);
     debug("showing time: %s\n", datetime_str);
 }
 
-void show_temperature() {
+void show_temperature(uint16_t temp) {
     static char temp_buf[LCD_MAX_CHARS+1];
     static char temp_str[LCD_MAX_CHARS+1];
-    uint16_t temp = get_temp();
     convert_temp_to_str(temp, &temp_buf[0]);
     snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s C              ", &temp_buf[0]);
     lcd_write(&temp_str[0], STATUS_LINE);
 }
 
-/* @deprecated old test function */
-// void show_temp_data(uint16_t temp, float temp_treshold) {
-//     char temp_str[6];
-//     char write_str[17];
+void show_prog_selection() {
+    static char temp_str[LCD_MAX_CHARS+1];
+    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "#%u %s          ", selected_program+1, is_prog_enabled(selected_program) ?
+#ifndef LANG_EN 
+    "ZAPNUT" : "VYPNUT"
+#else
+    "ON" : "OFF"
+#endif
+    );
+    lcd_write(&temp_str[0], STATUS_LINE);
+}
 
-//     if(temp >= 0 && temp < 1000) {
-//         convert_temp_to_str(temp, temp_str);
-//         sniprintf(write_str, 16, "T. namer: %s", temp_str);
-//         lcd_write(write_str, LCD_LINE_1);
-//     }
+//@todo jak označit co se mění? kurzor?
+//mohlo by být takto: >HH<:MM-HH:MM -> HH:>MM<-HH:MM -> atd.
+//měnit pomocí potíku?... potík bez zarážek? hmm
+//format HH:MM-HH:MM
+void show_prog_time(datetime_t* start, datetime_t* end, program_time_mode mode) {
+    const static char start_time_fmt[PROG_TIME_MODE_MAX][8] = {
+        "%H:%M", ">%H<:%M", "%H:>%M<", "%H:%M", "%H:%M"
+    };
+    const static char end_time_fmt[PROG_TIME_MODE_MAX][8] = {
+        "%H:%M", "%H:%M", "%H:%M", ">%H<:%M", "%H:>%M<"
+    };
+    static char temp_str[LCD_MAX_CHARS+1];
+    convert_datetime_to_str(&temp_str[0], 6, start_time_fmt[mode], start);
+    //this should not write over the whole string, but only change first 5 characters
+    static char temp_2[LCD_MAX_CHARS+1];
+    static char temp_3[LCD_MAX_CHARS+1];
+    convert_datetime_to_str(&temp_2[0], 6, end_time_fmt[mode], end);
+    snprintf(&temp_3[0], sizeof(temp_3), "%s-%s         ", &temp_str[0], &temp_2[0]);
+    debug("|%s|%s|%s|", start_time_fmt[mode], end_time_fmt[mode], temp_3);
+    lcd_write(&temp_3[0], STATUS_LINE);
 
-//     if(temp_treshold >= TEMPERATURE_SET_MIN && temp_treshold <= TEMPERATURE_SET_MAX) {
-//         sprintf(write_str, "T.  udrz: %2.1f", temp_treshold);
-//         lcd_write(write_str, LCD_LINE_2);
-//     }
-// }
+}
 
-void update_status(state_t state) {
+//formát ->
+/*
+PONDELI
+UTERY
+STREDA
+CTRVTEK
+PATEK
+SOBOTA
+NEDELE
+    tyto tři možnosti by měli být jako první
+PRACOVNI DEN    myšleno pondělí až pátek... mohlo by být taky takto: PONDELI-PATEK
+VIKEND          mohlo by být takto: SOBOTA+NEDELE
+CELY TYDEN
+*/
+void show_prog_weekday(uint8_t days) {
+    static char temp_str[LCD_MAX_CHARS+1];
+    switch(days) {
+                case WEEK:
+                    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s             ", 
+#ifndef LANG_EN
+            "CELY TYDEN"
+#else
+            "EVERY DAY"
+#endif              
+                    );
+                    break;
+                case WORK_DAY:
+                    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s             ", 
+#ifndef LANG_EN
+            "PRACOVNI DNY"
+#else
+            "WORK DAYS"
+#endif              
+                    );
+                    break;
+                case WEEKEND:
+                    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s             ", 
+#ifndef LANG_EN
+            "Vikend"
+#else
+            "Weekend"
+#endif              
+                    );
+                    break;
+                case MONDAY:
+                    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s             ", 
+#ifndef LANG_EN
+            "PONDELI"
+#else
+            "MONDAY"
+#endif              
+                    );
+                    break;
+                case TUESDAY:
+                    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s             ", 
+#ifndef LANG_EN
+            "UTERY"
+#else
+            "TUESDAY"
+#endif              
+                    );
+                    break;
+                case WEDNESDAY:
+                    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s             ", 
+#ifndef LANG_EN
+            "STREDA"
+#else
+            "WEDNESDAY"
+#endif              
+                    );
+                    break;
+                case THURSDAY:
+                    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s             ", 
+#ifndef LANG_EN
+            "CTVRTEK"
+#else
+            "THURSDAY"
+#endif              
+                    );
+                    break;
+                case FRIDAY:
+                    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s             ", 
+#ifndef LANG_EN
+            "PATEK"
+#else
+            "FRIDAY"
+#endif              
+                    );
+                    break;
+                case SATURDAY:
+                    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s             ", 
+#ifndef LANG_EN
+            "SOBOTA"
+#else
+            "SATURDAY"
+#endif              
+                    );
+                    break;
+                case SUNDAY:
+                    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s             ", 
+#ifndef LANG_EN
+            "NEDELE"
+#else
+            "SUNDAY"
+#endif              
+                    );
+                    break;
+                default:
+                    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s             ", 
+#ifndef LANG_EN
+            "NIKDY"
+#else
+            "NEVER"
+#endif              
+                    );
+                break;
+            }
+            lcd_write(&temp_str[0], STATUS_LINE);
+}
+
+// formát: TT.T C
+void show_prog_temp(uint16_t temp) {
+    static char temp_str[LCD_MAX_CHARS+1];
+    
+}
+
+void show_setn_reg_state(bool state) {
+    static char temp_str[LCD_MAX_CHARS+1];
+    snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s          ", state ?
+#ifndef LANG_EN 
+    "ZAPNUTO" : "VYPNUTO"
+#else
+    "ON" : "OFF"
+#endif
+    );
+    lcd_write(&temp_str[0], STATUS_LINE);
+
+}
+
+/**
+ * 
+ */
+void update_status(state_t state, program_t* program, thermo_settings_t* settings) {
     switch(state) {
         case S_SLEEP:
-            lcd_sleep();
             //uspat dokud se nevzbudí kvůli libovolného interuptu?
-            // v tom případě po jak dlouhé době se má kontrolovat udržování teploty?
-            change_var(S_SLEEP, VALUE_OK);
+            //v tom případě po jak dlouhé době se má kontrolovat udržování teploty?
+
+            //change_var(S_SLEEP, VALUE_OK); // <-- TOHLE NESMÍ BÝT VOLANÉ V RÁMCI UPDATE STATUS!!! JINAK JE ZDE NEKONEČNÁ SMYČKA! ... zatím dokud něco nezměním v rámci change_var
             return;
-        case S_SHOW_TIME:
-            show_time();
+        case S_MENU_TIME:
+            show_time(SETN_TIME_MODE_SHOW);
             break;
-        case S_SHOW_TEMP:
-            show_temperature();
+        case S_MENU_TEMP:
+            show_temperature(get_temp());
             break;
-        case S_SHOW_PROGS:
+        case S_MENU_PROGS:
+#ifndef LANG_EN
             lcd_write("zmenit programy ", STATUS_LINE);
+#else
+            lcd_write("change programs ", STATUS_LINE);
+#endif
             break;
-        case S_SHOW_SETN:
+        case S_MENU_SETN:
+#ifndef LANG_EN
             lcd_write("zmenit nastaveni", STATUS_LINE);
+#else
+            lcd_write("change settings ", STATUS_LINE);
+#endif
+            break;
+        
+        case S_PROG_SEL:
+            show_prog_selection();
+            break;
+        
+        case S_PROG_TIME_SET:
+            show_prog_time(&(program->start), &(program->end), program->PTM);
             break;
 
-        /* @todo ostatní stavy */
+        case S_PROG_WEEKDAY_SET:
+            show_prog_weekday(program->days);
+            break;
+            
+        case S_PROG_TEMP_SET:
+            show_temperature(program->temp);
+            break;
 
+        case S_SETN_TIME:
+            show_time(settings->STM);
+            break;
+
+        case S_SETN_HYST:
+            show_temperature(settings->hystersia);
+            break;
+
+        case S_SETN_OFF:
+            show_setn_reg_state(settings->temp_regulation_on);
+            break;
+
+        // S_VAR_CHANGE
         default:
-            lcd_write("                ", STATUS_LINE);
+            //lcd_write("                ", STATUS_LINE);
             break;
     }
 }
@@ -272,16 +556,40 @@ void update_status(state_t state) {
 void change_var(state_t var, uint16_t dir) {
     // @todo když se uspí protože se nic nedělalo tak zavolat tuto funkci s S_SLEEP
     // @todo pomatování zda se proměnná mění a které aby se nejdříve načetla do dočasné hodnoty ta uložená
-    // @todo !!! změna hodnoty by se neměla propsat dokud není zmáčknuto ok 
+    // @todo !!! změna hodnoty by se neměla propsat dokud není zmáčknuto ok
+    if(var == S_SLEEP) changing_var_at_state = S_SLEEP;
 
+    static datetime_t t = {
+            .year  = 2024,
+            .month = 12,
+            .day   = 01,
+            .dotw  = 0, // 0 is Sunday, so 5 is Friday
+            .hour  = 00,
+            .min   = 00,
+            .sec   = 00
+    };
 
+    bool prog_changing = false;
+    program_t temp_program = {
+        .start   = t,
+        .end     = t,
+        .days    = NEVER,
+        .temp    = 0,
+        .PTM     = PROG_TIME_MODE_SHOW
+    };
+
+    bool setn_changing = false;
+    static thermo_settings_t temp_setn = {
+        .temp_regulation_on = true,
+        .hystersia = DEFAULT_TEMPERATURE_HYSTERSIS,
+        .STM = SETN_TIME_MODE_SHOW
+    };
 
 
 
 
     //update the value on display 
-    /* @todo how to show the changing variable? */
-    update_status(var);
+    update_status(var, prog_changing ? &temp_program : &(programs[selected_program]), setn_changing ? &temp_setn : &(th_set));
 }
 
 /* set temperature will be center of hystersis curve */
@@ -307,17 +615,17 @@ void main_loop_logic(state_t state) {
     //if temperature regulation is on
     if(th_set.temp_regulation_on) {
         /* @todo get_temp_treshold byl měl brát teplotu ze struktury programů */
-        check_relay_state(convert_temp_to_float(get_temp_data()), get_temp_treshold());
+        check_relay_state(convert_temp_to_float(get_temp()), get_temp_treshold());
     }
 
     //je důležité pořadí?
-    update_status(state);
+    update_status(state, &(programs[selected_program]), &th_set);
     show_menu(state);
 }
 
 state_t main_loop_step(state_t state) {
     state_t next_state = state_table[state][next_action];
-    debug("stavy: %d %d %d\n", state, next_state, next_action);
+    debug("states: %d %d %d\n", state, next_state, next_action);
 
     //changing variable
     if(next_state == S_VAR_CHANGE && state != S_VAR_CHANGE) {
@@ -327,16 +635,28 @@ state_t main_loop_step(state_t state) {
     } else if(next_state != S_VAR_CHANGE && state == S_VAR_CHANGE) {
         next_state = changing_var_at_state;
         changing_var_at_state = S_SLEEP;
+
+    //selecting program
+    } else if(state == S_PROG_SEL && next_action == NA_LEFT) {
+        selected_program = (NUMBER_OF_PROGRAMS+selected_program-1) % NUMBER_OF_PROGRAMS;
+    } else if(state == S_PROG_SEL && next_action == NA_RIGHT) {
+        selected_program = (NUMBER_OF_PROGRAMS+selected_program+1) % NUMBER_OF_PROGRAMS;
+    } else if(state != S_SLEEP && next_state == S_SLEEP) {
+        lcd_sleep();
     }
     next_action = NA_NONE; // možná dát až po main loop logic?
 
-    static uint16_t timeout = SLEEP_TIMEOUT*1000;
+    static uint32_t timeout = SLEEP_TIMEOUT*1000;
 
     if(state == next_state) {
         //dekrement sleep timer
         //if sleep timer <= 0 goto sleep
         if(timeout <= 0) {
             //start sleep
+            change_var(S_SLEEP, VALUE_OK);
+            lcd_sleep();
+            next_state = S_SLEEP;
+            //nastavit stav na sleep?
             /* @todo sleep */
         } else {
             timeout -= MAIN_LOOP_REFRESH_TIMER;
@@ -371,8 +691,8 @@ int main() {
     /* @todo tohle nahradí načtení času z ntp... možná zde tohle nechám a ntp nastaví čas správně později */
     datetime_t t = {
             .year  = 2024,
-            .month = 11,
-            .day   = 17,
+            .month = 12,
+            .day   = 01,
             .dotw  = 0, // 0 is Sunday, so 5 is Friday
             .hour  = 00,
             .min   = 00,
@@ -389,6 +709,24 @@ int main() {
         return 1;
     }
     lcd_string("Hello, world!");
+
+    t.year = -1;
+    t.month = -1;
+    t.day = -1;
+    t.dotw = 00;
+    t.hour = 00;
+    t.min = 00;
+    t.sec = 00;
+
+    for(int i = 0; i < NUMBER_OF_PROGRAMS; i++) {
+        programs[i].start   = t;
+        t.hour = 23; // @test
+        t.min = 59; // @test
+        programs[i].end     = t;
+        programs[i].days    = NEVER;
+        programs[i].temp    = 0;
+        programs[i].PTM     = PROG_TIME_MODE_SHOW;
+    }
 
     btn_set_common_function(&wake_up);
     init_btn_rising_edge(BTN_1_GPIO, &btn_left);
@@ -415,3 +753,21 @@ int main() {
         debug("main loop end, state: %i\n", state);
     }
 }
+
+
+/* @deprecated old test function */
+// void show_temp_data(uint16_t temp, float temp_treshold) {
+//     char temp_str[6];
+//     char write_str[17];
+
+//     if(temp >= 0 && temp < 1000) {
+//         convert_temp_to_str(temp, temp_str);
+//         sniprintf(write_str, 16, "T. namer: %s", temp_str);
+//         lcd_write(write_str, LCD_LINE_1);
+//     }
+
+//     if(temp_treshold >= TEMPERATURE_SET_MIN && temp_treshold <= TEMPERATURE_SET_MAX) {
+//         sprintf(write_str, "T.  udrz: %2.1f", temp_treshold);
+//         lcd_write(write_str, LCD_LINE_2);
+//     }
+// }
