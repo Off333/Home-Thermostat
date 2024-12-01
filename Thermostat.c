@@ -29,7 +29,7 @@
 #include "button_driver.h"
 
 /* main loop sleep interval in miliseconds from end of loop to start of next loop */
-#define MAIN_LOOP_REFRESH_TIMER 200
+#define MAIN_LOOP_REFRESH_TIMER 1000
 
 /* timeout in seconds, after which the device will go to sleep */
 #define SLEEP_TIMEOUT 30
@@ -39,8 +39,8 @@
 
 #define TEMPERATURE_SET_MAX 30
 
-#define DEFAULT_TEMPERATURE_HYSTERSIS 20
-#define TEMP_HYSTERSIS_STEP
+#define DEFAULT_TEMPERATURE_HYSTERESIS 20
+#define TEMP_HYSTERESIS_STEP
 
 /* button pins */
 #define BTN_1_GPIO 19
@@ -78,7 +78,7 @@ typedef enum {
     NEXT_ACTION_T_MAX
 } next_action_t;
 
-/* deafults */
+/* defaults */
 #define DEFAULT_STATE       S_MENU_TIME
 #define DEFAULT_NEXT_ACTION NA_NONE
 
@@ -122,23 +122,23 @@ static const char menu_texts[][LCD_MAX_CHARS+1] = {
         "aktivni dny     ",  //S_PROG_WEEKDAY_SET
         "udrzovat teplotu",  //S_PROG_TEMP_SET
         "zmenit cas      ",  //S_SETN_TIME
-        "zmenit hysterzi ",  //S_SETN_HYST
+        "zmenit hysterezi",  //S_SETN_HYST
         "udrzovani teplot",  //S_SETN_OFF
-        ""                   //S_VAR_CHANGE - special use for empty string to not replace previus value
+        ""                   //S_VAR_CHANGE - special use for empty string to not replace previous value
 #else
         "                ",  //S_SLEEP
         "<setn|time|temp>",  //S_MENU_TIME
         "<time|temp|prog>",  //S_MENU_TEMP
         "<temp|prog|setn>",  //S_MENU_PROGS
         "<prog|setn|time>",  //S_MENU_SETN
-        "progam selection",  //S_PROG_SEL
+        "select program  ",  //S_PROG_SEL
         "start-end time  ",  //S_PROG_TIME_SET
         "set days        ",  //S_PROG_WEEKDAY_SET
         "set temperature ",  //S_PROG_TEMP_SET
         "set device time ",  //S_SETN_TIME
-        "set hystersia   ",  //S_SETN_HYST
+        "set hysteresis  ",  //S_SETN_HYST
         "regulate temps. ",  //S_SETN_OFF
-        ""                   //S_VAR_CHANGE - special use for empty string to not replace previus value
+        ""                   //S_VAR_CHANGE - special use for empty string to not replace previous value
 #endif
     };
 
@@ -158,11 +158,11 @@ typedef enum {
 /**
  * @typedef thermo_settings_t
  * @param temp_regulation_on true for thermostat to try to keep the temperature
- * @param hystersia is represented in 10x C with wanted temperature in middle and 1/2*val around the temp
+ * @param hysteresis is represented in 10x C with wanted temperature in middle and 1/2*val around the temp
  */
 typedef struct{
     bool temp_regulation_on;
-    uint16_t hystersia;
+    uint16_t hysteresis;
 
     setn_time_mode STM; //special variable for showing which part of time in settings is changing
 } thermo_settings_t;
@@ -170,7 +170,7 @@ typedef struct{
 //default settings
 thermo_settings_t th_set = {
     .temp_regulation_on = true,
-    .hystersia = DEFAULT_TEMPERATURE_HYSTERSIS,
+    .hysteresis = DEFAULT_TEMPERATURE_HYSTERESIS,
     .STM = SETN_TIME_MODE_SHOW
 };
 //*time is stored in RTC
@@ -197,7 +197,7 @@ typedef enum {
 #define WEEK        (MONDAY | TUESDAY | WEDNESDAY | THURSDAY | FRIDAY | SATURDAY | SUNDAY)
 #define NEVER       0b00000000
 
-/* --- PROGRAMS STRUCUTRE --- */
+/* --- PROGRAMS STRUCTURE --- */
 
 /**
  * @typedef program_t
@@ -214,7 +214,7 @@ typedef struct{
 
 #define NUMBER_OF_PROGRAMS 14
 
-program_t programs[NUMBER_OF_PROGRAMS]; // @todo inicialize the structures before main loop
+program_t programs[NUMBER_OF_PROGRAMS]; // @todo initialize the structures before main loop
 uint16_t selected_program = 0;
 
 /* --- HELPER FUNCTIONS --- */
@@ -231,6 +231,11 @@ void convert_datetime_to_str(char *str, size_t buf_size, const char *fmt, dateti
 //     return programs[prog_num].days != NEVER;
 // }
 
+#define is_prog_setting(state) (state == S_PROG_TEMP_SET || state == S_PROG_TIME_SET || state == S_PROG_WEEKDAY_SET)
+#define is_setn_setting(state) (state == S_SETN_HYST || state == S_SETN_OFF || state == S_SETN_TIME)
+
+//will not work correctly for int == 0
+#define sign(int) (int > 0 ? 1 : -1)
 
 /* --- CALLBACKS --- */
 void wake_up() {
@@ -238,7 +243,7 @@ void wake_up() {
     lcd_refresh_on_timer();
 }
 
-void change_var(state_t var, uint16_t dir);
+void change_var(state_t var, int16_t dir);
 
 void btn_left() {
     next_action = NA_LEFT;
@@ -293,7 +298,7 @@ void show_time(setn_time_mode mode) {
     rtc_get_datetime(&dt);
     convert_datetime_to_str(datetime_str, sizeof(datetime_buf), time_fmt[mode], &dt);
     lcd_write(datetime_str, STATUS_LINE);
-    debug("showing time: %s\n", datetime_str);
+    debug("showing time: %s", datetime_str);
 }
 
 void show_temperature(uint16_t temp) {
@@ -328,11 +333,11 @@ void show_prog_time(datetime_t* start, datetime_t* end, program_time_mode mode) 
         "%H:%M", "%H:%M", "%H:%M", ">%H<:%M", "%H:>%M<"
     };
     static char temp_str[LCD_MAX_CHARS+1];
-    convert_datetime_to_str(&temp_str[0], 6, start_time_fmt[mode], start);
+    convert_datetime_to_str(&temp_str[0], 8, start_time_fmt[mode], start);
     //this should not write over the whole string, but only change first 5 characters
     static char temp_2[LCD_MAX_CHARS+1];
     static char temp_3[LCD_MAX_CHARS+1];
-    convert_datetime_to_str(&temp_2[0], 6, end_time_fmt[mode], end);
+    convert_datetime_to_str(&temp_2[0], 8, end_time_fmt[mode], end);
     snprintf(&temp_3[0], sizeof(temp_3), "%s-%s         ", &temp_str[0], &temp_2[0]);
     debug("|%s|%s|%s|", start_time_fmt[mode], end_time_fmt[mode], temp_3);
     lcd_write(&temp_3[0], STATUS_LINE);
@@ -344,7 +349,7 @@ void show_prog_time(datetime_t* start, datetime_t* end, program_time_mode mode) 
 PONDELI
 UTERY
 STREDA
-CTRVTEK
+CTVRTEK
 PATEK
 SOBOTA
 NEDELE
@@ -484,7 +489,7 @@ void show_setn_reg_state(bool state) {
 void update_status(state_t state, program_t* program, thermo_settings_t* settings) {
     switch(state) {
         case S_SLEEP:
-            //uspat dokud se nevzbudí kvůli libovolného interuptu?
+            //uspat dokud se nevzbudí kvůli libovolného interputu?
             //v tom případě po jak dlouhé době se má kontrolovat udržování teploty?
 
             //change_var(S_SLEEP, VALUE_OK); // <-- TOHLE NESMÍ BÝT VOLANÉ V RÁMCI UPDATE STATUS!!! JINAK JE ZDE NEKONEČNÁ SMYČKA! ... zatím dokud něco nezměním v rámci change_var
@@ -531,14 +536,15 @@ void update_status(state_t state, program_t* program, thermo_settings_t* setting
             break;
 
         case S_SETN_HYST:
-            show_temperature(settings->hystersia);
+            show_temperature(settings->hysteresis);
             break;
 
         case S_SETN_OFF:
             show_setn_reg_state(settings->temp_regulation_on);
             break;
 
-        // S_VAR_CHANGE
+        // case S_VAR_CHANGE:
+        //     break;
         default:
             //lcd_write("                ", STATUS_LINE);
             break;
@@ -549,61 +555,145 @@ void update_status(state_t state, program_t* program, thermo_settings_t* setting
 
 /**
  * This function keeps note of changed variables, changes them and can save(apply) the current value
- * @param var variable that will be changed represented by state. When function is called consectutivly and state is diffrent, then internal value is reset to that of saved value of variable of newe state.
+ * @param var variable that will be changed represented by state. When function is called consecutively and state is different, then internal value is reset to that of saved value of variable of new state.
  * If S_SLEEP is called as variable, then internal values are simply reset.
  * @param dir direction. Which way or how the variable should change. 1 usually means up -1 means down and 0 to save.
  */
-void change_var(state_t var, uint16_t dir) {
+void change_var(state_t var, int16_t dir) {
     // @todo když se uspí protože se nic nedělalo tak zavolat tuto funkci s S_SLEEP
-    // @todo pomatování zda se proměnná mění a které aby se nejdříve načetla do dočasné hodnoty ta uložená
+    // @todo pamatování zda se proměnná mění a které aby se nejdříve načetla do dočasné hodnoty ta uložená
     // @todo !!! změna hodnoty by se neměla propsat dokud není zmáčknuto ok
-    if(var == S_SLEEP) changing_var_at_state = S_SLEEP;
 
-    static datetime_t t = {
-            .year  = 2024,
-            .month = 12,
-            .day   = 01,
-            .dotw  = 0, // 0 is Sunday, so 5 is Friday
-            .hour  = 00,
-            .min   = 00,
-            .sec   = 00
-    };
+    static state_t previous_var = S_SLEEP;
+    if(var == S_SLEEP) {
+        previous_var = S_SLEEP;
+        return;
+    }
+
+    // static datetime_t t = { //??
+    //         .year  = 2024,
+    //         .month = 12,
+    //         .day   = 01,
+    //         .dotw  = 0, // 0 is Sunday, so 5 is Friday
+    //         .hour  = 00,
+    //         .min   = 00,
+    //         .sec   = 00
+    // };
 
     bool prog_changing = false;
-    program_t temp_program = {
-        .start   = t,
-        .end     = t,
-        .days    = NEVER,
-        .temp    = 0,
-        .PTM     = PROG_TIME_MODE_SHOW
-    };
+    static program_t temp_program;
 
     bool setn_changing = false;
-    static thermo_settings_t temp_setn = {
+    static thermo_settings_t temp_setn = { //this may not be needed? This just in case, when the data from saved wasn't fetched...
         .temp_regulation_on = true,
-        .hystersia = DEFAULT_TEMPERATURE_HYSTERSIS,
+        .hysteresis = DEFAULT_TEMPERATURE_HYSTERESIS,
         .STM = SETN_TIME_MODE_SHOW
     };
 
+    //change temporary variables to current values 
+    if(var != previous_var) {
+        temp_program = programs[selected_program];
+        temp_setn = th_set;
+        previous_var = var;
+        temp_program.PTM = PROG_TIME_MODE_SET_HOUR_START;
+        temp_setn.STM = SETN_TIME_MODE_SET_HOUR;
+    } else {
+        //choose whatever device settings or program settings are are being changed
+        if(is_prog_setting(var)) prog_changing = true;
+        else if(is_setn_setting(var)) setn_changing = true;
+    }
 
+    //change the variable according to direction
+    switch(var) {
+        case S_PROG_TIME_SET:
+            if(dir) {
+                switch (temp_program.PTM) {
+                    case PROG_TIME_MODE_SET_HOUR_START:
+                        temp_program.start.hour = (uint8_t)((24+(int16_t)temp_program.start.hour + dir)%24);
+                        break;
+                    case PROG_TIME_MODE_SET_MIN_START:
+                        temp_program.start.min = (uint8_t)((60+(int16_t)temp_program.start.min + dir)%60);
+                        break;
+                    case PROG_TIME_MODE_SET_HOUR_END:
+                        temp_program.end.hour = (uint8_t)((24+(int16_t)temp_program.end.hour + dir)%24);
+                        break;
+                    case PROG_TIME_MODE_SET_MIN_END:
+                        temp_program.end.min = (uint8_t)((60+(int16_t)temp_program.end.min + dir)%60);
+                        break;
+                }
+            } else if(prog_changing) { //Save
+                //next time value
+                if(temp_program.PTM < PROG_TIME_MODE_MAX-1) {
+                    temp_program.PTM += 1;
+                    changing_var_at_state = previous_var = var; // keep in the changing state even after enter
+                } else { //actual save
+                    programs[selected_program].start.hour  =  temp_program.start.hour; 
+                    programs[selected_program].start.min   =  temp_program.start.min;
+                    programs[selected_program].end.hour    =  temp_program.end.hour;
+                    programs[selected_program].end.min     =  temp_program.end.min;
+                    previous_var = S_SLEEP; // this must be at the save of each case, because of how time values are changed
+                    next_action = NA_ESC;
+                } 
+            }
+            break;
+        case S_PROG_WEEKDAY_SET:
+            if(dir) {
 
+            } else { //Save
+                previous_var = S_SLEEP;
+                next_action = NA_ESC;
+            }
+            break;
+        case S_PROG_TEMP_SET:
+            if(dir) {
+
+            } else { //Save
+                previous_var = S_SLEEP;
+                next_action = NA_ESC;
+            }
+            break;
+        case S_SETN_TIME:
+            if(dir) {
+
+            } else { //Save
+                previous_var = S_SLEEP;
+                next_action = NA_ESC;
+            }
+            break;
+        case S_SETN_HYST:
+            if(dir) {
+
+            } else { //Save
+                previous_var = S_SLEEP;
+                next_action = NA_ESC;
+            }
+            break;
+        case S_SETN_OFF:
+            if(dir) {
+
+            } else { //Save
+                previous_var = S_SLEEP;
+                next_action = NA_ESC;
+            }
+            break;
+    }
 
     //update the value on display 
-    update_status(var, prog_changing ? &temp_program : &(programs[selected_program]), setn_changing ? &temp_setn : &(th_set));
+    update_status(var, &temp_program, &temp_setn);
 }
 
-/* set temperature will be center of hystersis curve */
+/* set temperature will be center of HYSTERESIS curve */
 void check_relay_state(float current_temp, float set_temp) {
-    if(current_temp > set_temp + th_set.hystersia/20) {
+    if(current_temp > set_temp + th_set.hysteresis/20) {
         relay_off();
-    } else if(current_temp < set_temp - th_set.hystersia/20) {
+    } else if(current_temp < set_temp - th_set.hysteresis/20) {
         relay_on();
     }
 }
 
 /* --- READ FUNCTIONS --- */
 
-float get_temp_treshold() {
+float get_temp_threshold() {
     return TEMPERATURE_SET_MIN + (TEMPERATURE_SET_MAX-TEMPERATURE_SET_MIN)*((100-get_pot_val())/100.0f);
 }
 
@@ -614,8 +704,8 @@ void main_loop_logic(state_t state) {
 
     //if temperature regulation is on
     if(th_set.temp_regulation_on) {
-        /* @todo get_temp_treshold byl měl brát teplotu ze struktury programů */
-        check_relay_state(convert_temp_to_float(get_temp()), get_temp_treshold());
+        /* @todo get_temp_threshold byl měl brát teplotu ze struktury programů */
+        check_relay_state(convert_temp_to_float(get_temp()), get_temp_threshold());
     }
 
     //je důležité pořadí?
@@ -625,14 +715,15 @@ void main_loop_logic(state_t state) {
 
 state_t main_loop_step(state_t state) {
     state_t next_state = state_table[state][next_action];
-    debug("states: %d %d %d\n", state, next_state, next_action);
+    debug("state: %d next_state: %d action: %d s_var_change: %d", state, next_state, next_action, changing_var_at_state);
 
     //changing variable
     if(next_state == S_VAR_CHANGE && state != S_VAR_CHANGE) {
         changing_var_at_state = state;
-
+        change_var(changing_var_at_state, VALUE_OK);
     //stopped changing variable
     } else if(next_state != S_VAR_CHANGE && state == S_VAR_CHANGE) {
+        debug("%d %d", state, next_state);
         next_state = changing_var_at_state;
         changing_var_at_state = S_SLEEP;
 
@@ -648,7 +739,7 @@ state_t main_loop_step(state_t state) {
 
     static uint32_t timeout = SLEEP_TIMEOUT*1000;
 
-    if(state == next_state) {
+    if(state == next_state && state != S_VAR_CHANGE) {
         //dekrement sleep timer
         //if sleep timer <= 0 goto sleep
         if(timeout <= 0) {
@@ -670,7 +761,7 @@ state_t main_loop_step(state_t state) {
 
 int main() {
 
-    /* --- INICIALIZATION --- */
+    /* --- INITIALIZATION --- */
     //busy_wait_ms(2000);
     debug("initialization...\n", "");
 
@@ -682,7 +773,7 @@ int main() {
     }
 
     if(pot_init()) {
-        debug("potenciometer init failed!\n", "");
+        debug("potenciometr init failed!\n", "");
         return 1;
     }
 
@@ -718,11 +809,19 @@ int main() {
     t.min = 00;
     t.sec = 00;
 
+    datetime_t t2 = { // @test
+        .year  = -1,
+        .month = -1,
+        .day   = -1,
+        .dotw  = 0, // 0 is Sunday, so 5 is Friday
+        .hour  = 23,
+        .min   = 59,
+        .sec   = 00
+    };
+
     for(int i = 0; i < NUMBER_OF_PROGRAMS; i++) {
-        programs[i].start   = t;
-        t.hour = 23; // @test
-        t.min = 59; // @test
-        programs[i].end     = t;
+        programs[i].start   = t; // @bug MUSÍ BÝT NASTAVENO PRO KAŽDÝ PROGRAM ZVLÁŠŤ!!!
+        programs[i].end     = t2;// @bug MUSÍ BÝT NASTAVENO PRO KAŽDÝ PROGRAM ZVLÁŠŤ!!!
         programs[i].days    = NEVER;
         programs[i].temp    = 0;
         programs[i].PTM     = PROG_TIME_MODE_SHOW;
@@ -740,6 +839,7 @@ int main() {
 
     /* --- MAIN LOOP --- */
 
+    // @todo čekat ve smyčce dokud není zmáčknut čudlík? << nebo přímo uspat?
     state_t state = DEFAULT_STATE;
     next_action = DEFAULT_NEXT_ACTION;
     while (true) {
@@ -750,13 +850,13 @@ int main() {
 
         sleep_ms(MAIN_LOOP_REFRESH_TIMER);
 
-        debug("main loop end, state: %i\n", state);
+        //debug("main loop end, state: %i\n", state);
     }
 }
 
 
 /* @deprecated old test function */
-// void show_temp_data(uint16_t temp, float temp_treshold) {
+// void show_temp_data(uint16_t temp, float temp_threshold) {
 //     char temp_str[6];
 //     char write_str[17];
 
@@ -766,8 +866,8 @@ int main() {
 //         lcd_write(write_str, LCD_LINE_1);
 //     }
 
-//     if(temp_treshold >= TEMPERATURE_SET_MIN && temp_treshold <= TEMPERATURE_SET_MAX) {
-//         sprintf(write_str, "T.  udrz: %2.1f", temp_treshold);
+//     if(temp_threshold >= TEMPERATURE_SET_MIN && temp_threshold <= TEMPERATURE_SET_MAX) {
+//         sprintf(write_str, "T.  udrz: %2.1f", temp_threshold);
 //         lcd_write(write_str, LCD_LINE_2);
 //     }
 // }
