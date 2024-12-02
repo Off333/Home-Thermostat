@@ -918,8 +918,8 @@ int main() {
     };
 
     for(int i = 0; i < NUMBER_OF_PROGRAMS; i++) {
-        programs[i].start   = t; // @bug MUSÍ BÝT NASTAVENO PRO KAŽDÝ PROGRAM ZVLÁŠŤ!!!
-        programs[i].end     = t2;// @bug MUSÍ BÝT NASTAVENO PRO KAŽDÝ PROGRAM ZVLÁŠŤ!!!
+        programs[i].start   = t; 
+        programs[i].end     = t2;
         programs[i].days    = NEVER;
         programs[i].temp    = 0;
         programs[i].PTM     = PROG_TIME_MODE_SHOW;

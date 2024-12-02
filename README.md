@@ -10,17 +10,17 @@ wifi
 
 logika termostatu
  - rtc alarmy
- - nastavení různé teploty na různé časy
-    - struktura pro ukládání
+ - ✓ nastavení různé teploty na různé časy
+    - ✓ struktura pro ukládání
     - hlídání těchto časů přes alarmy
         - jak lze udělat křivky? -> například granuálně po 5 minutách měnit podle grafu křivky(funkce)
 
 menu a ovládání
- - nastavení teplot
- - nastavitelná hysterze temploty 
- - základní nastavení
+ - ✓ nastavení teplot
+ - ✓ nastavitelná hysterze temploty 
+ - ✓ základní nastavení
  - vypnutí/zapnutí webserveru?
- - úplné pozastavení hlídání teploty?
+ - ✓ úplné pozastavení hlídání teploty?
 
 ukládání a statistika teplot
 
@@ -31,6 +31,8 @@ krabička pro termostat
  - otvory pro indikační ledky?
 
 kalibrace teploměru (teploměr na pico)
+
+@bug Tlačítka nemají hlídání na odrazy
 
 vypnutí potenciometru, když není potřeba
 
