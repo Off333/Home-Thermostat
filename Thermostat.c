@@ -40,7 +40,8 @@
 #define TEMPERATURE_SET_MAX 30
 
 #define DEFAULT_TEMPERATURE_HYSTERESIS 20
-#define TEMP_HYSTERESIS_STEP
+#define HYSTERESIS_MIN 04
+#define HYSTERESIS_MAX 50
 
 /* button pins */
 #define BTN_1_GPIO 19
@@ -217,6 +218,17 @@ typedef struct{
 program_t programs[NUMBER_OF_PROGRAMS]; // @todo initialize the structures before main loop
 uint16_t selected_program = 0;
 
+
+datetime_t temp_time = {
+        .year  = 2024,
+        .month = 12,
+        .day   = 01,
+        .dotw  = 0, // 0 is Sunday, so 5 is Friday
+        .hour  = 00,
+        .min   = 00,
+        .sec   = 00
+};
+
 /* --- HELPER FUNCTIONS --- */
 
 void convert_datetime_to_str(char *str, size_t buf_size, const char *fmt, datetime_t *dt) {
@@ -224,6 +236,24 @@ void convert_datetime_to_str(char *str, size_t buf_size, const char *fmt, dateti
     datetime_to_time(dt, &t);
     struct tm* time_struct = localtime(&t);
     strftime(str, buf_size, fmt, time_struct);
+}
+
+/**
+ * month in range 1 to 12 1 is january
+ */
+uint16_t get_max_days_in_month(uint8_t month, uint16_t year) {
+    const static uint8_t max_days[] = {
+        0,  31, 28,//uhmmmmm únor je na 2 věci... -_-
+        31, 30, 31,
+        30, 31, 31,
+        30, 31, 30,
+        31
+    };
+
+    //leap year... it's not perfect, but only approximation (this code will not be used for more then 400 years)
+    if(month == 2 && !(year%4) && (year%100)) return 29;
+
+    return max_days[month];
 }
 
 #define is_prog_enabled(prog_num) (programs[prog_num].days != NEVER)
@@ -295,7 +325,8 @@ void show_time(setn_time_mode mode) {
     static char datetime_buf[LCD_MAX_CHARS+1];
     static char *datetime_str = &datetime_buf[0];
     static datetime_t dt;
-    rtc_get_datetime(&dt);
+    if(!mode) rtc_get_datetime(&dt);
+    else dt = temp_time;
     convert_datetime_to_str(datetime_str, sizeof(datetime_buf), time_fmt[mode], &dt);
     lcd_write(datetime_str, STATUS_LINE);
     debug("showing time: %s", datetime_str);
@@ -382,9 +413,9 @@ void show_prog_weekday(uint8_t days) {
                 case WEEKEND:
                     snprintf(&temp_str[0], LCD_MAX_CHARS+1, "%s             ", 
 #ifndef LANG_EN
-            "Vikend"
+            "VIKEND"
 #else
-            "Weekend"
+            "WEEKEND"
 #endif              
                     );
                     break;
@@ -570,15 +601,6 @@ void change_var(state_t var, int16_t dir) {
         return;
     }
 
-    // static datetime_t t = { //??
-    //         .year  = 2024,
-    //         .month = 12,
-    //         .day   = 01,
-    //         .dotw  = 0, // 0 is Sunday, so 5 is Friday
-    //         .hour  = 00,
-    //         .min   = 00,
-    //         .sec   = 00
-    // };
 
     bool prog_changing = false;
     static program_t temp_program;
@@ -597,6 +619,7 @@ void change_var(state_t var, int16_t dir) {
         previous_var = var;
         temp_program.PTM = PROG_TIME_MODE_SET_HOUR_START;
         temp_setn.STM = SETN_TIME_MODE_SET_HOUR;
+        if(var == S_SETN_TIME) rtc_get_datetime(&temp_time); //get time from rtc only when it's needed
     } else {
         //choose whatever device settings or program settings are are being changed
         if(is_prog_setting(var)) prog_changing = true;
@@ -627,6 +650,7 @@ void change_var(state_t var, int16_t dir) {
                     temp_program.PTM += 1;
                     changing_var_at_state = previous_var = var; // keep in the changing state even after enter
                 } else { //actual save
+                    // @todo validation
                     programs[selected_program].start.hour  =  temp_program.start.hour; 
                     programs[selected_program].start.min   =  temp_program.start.min;
                     programs[selected_program].end.hour    =  temp_program.end.hour;
@@ -637,41 +661,115 @@ void change_var(state_t var, int16_t dir) {
             }
             break;
         case S_PROG_WEEKDAY_SET:
-            if(dir) {
-
+            if(dir) { // @bug čudlík se bouncne a tohle přepne 2x :(
+                // NEVER -> WORK_DAY -> WEEKEND -> WEEK -> MONDAY -> TUESDAY -> WEDNESDAY -> THURSDAY -> FRIDAY -> SATURDAY -> SUNDAY
+                switch (temp_program.days) { //this should be done absolutely different way
+                    case NEVER:
+                        temp_program.days = dir < 0 ? SUNDAY : WORK_DAY;
+                        break;
+                    case WORK_DAY:
+                        temp_program.days = dir < 0 ? NEVER : WEEKEND;
+                        break;
+                    case WEEKEND:
+                        temp_program.days = dir < 0 ? WORK_DAY : WEEK;
+                        break;
+                    case WEEK:
+                        temp_program.days = dir < 0 ? WEEKEND : MONDAY;
+                        break;
+                    case MONDAY:
+                        temp_program.days = dir < 0 ? WEEK : TUESDAY;
+                        break;
+                    case TUESDAY:
+                        temp_program.days = dir < 0 ? MONDAY : WEDNESDAY;
+                        break;
+                    case WEDNESDAY:
+                        temp_program.days = dir < 0 ? TUESDAY : THURSDAY;
+                        break;
+                    case THURSDAY:
+                        temp_program.days = dir < 0 ? WEDNESDAY : FRIDAY;
+                        break;
+                    case FRIDAY:
+                        temp_program.days = dir < 0 ? THURSDAY : SATURDAY;
+                        break;
+                    case SATURDAY:
+                        temp_program.days = dir < 0 ? FRIDAY : SUNDAY;
+                        break;
+                    case SUNDAY:
+                        temp_program.days = dir < 0 ? SATURDAY : NEVER;
+                        break;
+                }
+                debug("switching days to: %d", temp_program.days);
+        
             } else { //Save
+                // @todo validation
+                programs[selected_program].days = temp_program.days; 
                 previous_var = S_SLEEP;
                 next_action = NA_ESC;
             }
             break;
         case S_PROG_TEMP_SET:
             if(dir) {
-
+                //I can use max and min pro standard math library...
+                temp_program.temp = temp_program.temp + dir;
+                if(temp_program.temp < TEMPERATURE_SET_MIN*10) temp_program.temp = TEMPERATURE_SET_MIN*10;
+                else if(temp_program.temp > TEMPERATURE_SET_MAX*10) temp_program.temp = TEMPERATURE_SET_MAX*10;
             } else { //Save
+                //I hope no validation si needed
+                programs[selected_program].temp = temp_program.temp;
                 previous_var = S_SLEEP;
                 next_action = NA_ESC;
             }
             break;
         case S_SETN_TIME:
             if(dir) {
-
-            } else { //Save
-                previous_var = S_SLEEP;
-                next_action = NA_ESC;
+                switch (temp_setn.STM) {
+                    case SETN_TIME_MODE_SET_HOUR:
+                        temp_time.hour = (uint8_t)((24+(int16_t)temp_time.hour + dir)%24);
+                        break;
+                    case SETN_TIME_MODE_SET_MIN:
+                        temp_time.min = (uint8_t)((60+(int16_t)temp_time.min + dir)%60);
+                        break;
+                    case SETN_TIME_MODE_SET_DAY:
+                        uint8_t max_days = get_max_days_in_month(temp_time.month, temp_time.year);
+                        temp_time.day = (int8_t)((max_days+(int16_t)temp_time.day + dir)%max_days);
+                        break;
+                    case SETN_TIME_MODE_SET_MONTH:
+                        temp_time.month = (uint8_t)((12+(int16_t)temp_time.month + dir)%12);
+                        break;
+                    case SETN_TIME_MODE_SET_YEAR:
+                        temp_time.year = temp_time.year + dir;
+                        break;
+                }
+            } else if(setn_changing) { //Save
+                //next time value
+                if(temp_setn.STM < SETN_TIME_MODE_MAX-1) {
+                    temp_setn.STM += 1;
+                    changing_var_at_state = previous_var = var; // keep in the changing state even after enter
+                } else { //actual save
+                    // @todo validation
+                    rtc_set_datetime(&temp_time);
+                    previous_var = S_SLEEP; // this must be at the save of each case, because of how time values are changed
+                    next_action = NA_ESC;
+                } 
             }
             break;
         case S_SETN_HYST:
             if(dir) {
-
+                //I can use max and min pro standard math library...
+                temp_setn.hysteresis = temp_setn.hysteresis + 2*dir;
+                if(temp_setn.hysteresis < HYSTERESIS_MIN) temp_setn.hysteresis = HYSTERESIS_MIN;
+                else if(temp_setn.hysteresis > HYSTERESIS_MAX) temp_setn.hysteresis = HYSTERESIS_MAX;
             } else { //Save
+                th_set.hysteresis = temp_setn.hysteresis;
                 previous_var = S_SLEEP;
                 next_action = NA_ESC;
             }
             break;
         case S_SETN_OFF:
             if(dir) {
-
+                temp_setn.temp_regulation_on = !temp_setn.temp_regulation_on;
             } else { //Save
+                th_set.temp_regulation_on = temp_setn.temp_regulation_on;
                 previous_var = S_SLEEP;
                 next_action = NA_ESC;
             }
