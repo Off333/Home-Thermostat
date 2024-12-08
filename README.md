@@ -1,42 +1,51 @@
+*BUGS*:
+ - @bug Tlačítka nemají hlídání na odrazy
+
 **TODO**: 
 
 ✓ přidat state machine
-
-wifi
- - připojení
- - ntp
- - jednoduchý web server (bude aktivní pořád?)
- - odpojování od wifi?
 
 logika termostatu
  - rtc alarmy
  - ✓ nastavení různé teploty na různé časy
     - ✓ struktura pro ukládání
     - hlídání těchto časů přes alarmy
-        - jak lze udělat křivky? -> například granuálně po 5 minutách měnit podle grafu křivky(funkce)
+        - jak lze udělat křivky? -> například postupně po 5 minutách měnit podle grafu křivky(funkce)
 
 menu a ovládání
  - ✓ nastavení teplot
- - ✓ nastavitelná hysterze temploty 
+ - ✓ nastavitelná hystereze teploty 
  - ✓ základní nastavení
  - vypnutí/zapnutí webserveru?
  - ✓ úplné pozastavení hlídání teploty?
+ - ovládání pomocí potíku
 
-ukládání a statistika teplot
+refresh pouze pokud je zmáčknuto tlačítko
+ - jediný problém je zobrazení reálného času... tam je asi možno refresh po 1s... jinak by se měl main loop proběhnout jen 1x za dlouhou dobu... třeba 5 min a hlídat teplotu
 
+wifi
+ - ✓ připojení
+ - ✓ ntp
+ - jednoduchý web server (bude aktivní pořád?)
+ - ? nwm jestli deinit odpojí odpojování od wifi?
+  
 krabička pro termostat
  - tlačítka a otočný úchyt pro potík
  - obrazovka
  - zapnutí/vypnutí termostatu?
  - otvory pro indikační ledky?
 
-kalibrace teploměru (teploměr na pico)
+výpis co se děje při inicializaci zařízení na obrazovku
 
-@bug Tlačítka nemají hlídání na odrazy
+vypnutí/zapnutí potenciometru, když není potřeba
+vypnutí/zapnutí teploměru, aby nemusel měřit když nemusí
+ - pokud se teplota hlídá co 3 minuty tak není potřeba vědět teplotu každé 2 sekundy
 
-vypnutí potenciometru, když není potřeba
+kalibrace teploměru (teploměr na pico?)
 
-dokumentace <!-- <-this -->
+ukládání a statistika teplot
+
+dokumentace a toto readme <!-- <-this -->
 
 Relevantní odkazy:
  - https://forums.raspberrypi.com/viewtopic.php?t=339289

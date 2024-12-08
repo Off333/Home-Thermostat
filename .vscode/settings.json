@@ -42,6 +42,7 @@
         "adc_driver.h": "c",
         "button_driver.h": "c",
         "sync.h": "c",
-        "cstdio": "cpp"
+        "cstdio": "cpp",
+        "debug.h": "c"
     }
 }

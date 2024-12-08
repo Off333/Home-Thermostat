@@ -16,6 +16,11 @@
 #include "pico/stdlib.h"
 #include "hardware/rtc.h"
 #include "pico/util/datetime.h"
+#include "pico/cyw43_arch.h"
+
+#include "lwip/dns.h"
+#include "lwip/pbuf.h"
+#include "lwip/udp.h"
 
 /* DEBUG PRINTING FUNCTION */
 #define DEBUG 1
@@ -28,11 +33,21 @@
 #include "potenciometer.h"
 #include "button_driver.h"
 
+//wifi stuff
+#include "ntp.h"
+#include "wifi_psswd.h"
+
 /* main loop sleep interval in miliseconds from end of loop to start of next loop */
 #define MAIN_LOOP_REFRESH_TIMER 1000
 
 /* timeout in seconds, after which the device will go to sleep */
 #define SLEEP_TIMEOUT 30
+
+/* wifi constants */
+#define USE_WIFI 1
+#define USE_NTP 1
+#define MAX_CONN_TRIES 10
+#define RECON_TIMEOUT 5
 
 /* temperature limits in °C */
 #define TEMPERATURE_SET_MIN 15
@@ -860,18 +875,19 @@ state_t main_loop_step(state_t state) {
 int main() {
 
     /* --- INITIALIZATION --- */
-    //busy_wait_ms(2000);
-    debug("initialization...\n", "");
+    printf("START\n");
+    busy_wait_ms(2000);
+    debug("initialization...", "");
 
     stdio_init_all();
 
     if(temp_sensor_init()) {
-        debug("temp sensor init failed!\n", "");
+        debug("temp sensor init failed!", "");
         return 1;
     }
 
     if(pot_init()) {
-        debug("potenciometr init failed!\n", "");
+        debug("potenciometr init failed!", "");
         return 1;
     }
 
@@ -894,7 +910,7 @@ int main() {
     relay_init();
 
     if(lcd_init()) {
-        debug("lcd init failed!\n", "");
+        debug("lcd init failed!", "");
         return 1;
     }
     lcd_string("Hello, world!");
@@ -925,15 +941,72 @@ int main() {
         programs[i].PTM     = PROG_TIME_MODE_SHOW;
     }
 
+#if USE_WIFI
+
+    if (cyw43_arch_init()) {
+        debug("failed to initialise wifi driver", "");
+        return 1;
+    }
+    
+
+    cyw43_arch_enable_sta_mode();
+
+    int err_code = -1;
+
+    for(int i = 0; i < MAX_CONN_TRIES; i++) {
+        err_code = cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 10000);
+        if(err_code) {
+            debug("failed to connect to wifi - code %d", err_code);
+            sleep_ms(1000*RECON_TIMEOUT+ rand()%1000);
+        } else break;
+    }
+
+    if(err_code) {
+        debug("max connection attempts reached", "");
+        cyw43_arch_deinit();
+        return err_code;
+    }
+
+    busy_wait_ms(600);
+
+#if USE_NTP 
+
+    debug("probing ntp", "");
+
+    struct tm ntp_time;
+
+    run_ntp(&ntp_time);
+
+
+    time_t mkt = mktime(&ntp_time);
+
+
+    if(!time_to_datetime(mkt, &t)) {
+        debug("time conversion error (time_t to datetime_t)", "");
+        cyw43_arch_deinit();
+        return 1;
+    }
+
+
+    rtc_set_datetime(&t);
+
+#endif
+
+    busy_wait_ms(200);
+
+    cyw43_arch_deinit();
+
+#endif
+
     btn_set_common_function(&wake_up);
     init_btn_rising_edge(BTN_1_GPIO, &btn_left);
     init_btn_rising_edge(BTN_2_GPIO, &btn_right);
     init_btn_rising_edge(BTN_3_GPIO, &btn_enter);
     init_btn_rising_edge(BTN_4_GPIO, &btn_cancel);
 
-    sleep_ms(1000);
+    busy_wait_ms(200);
     lcd_clear();
-    debug("initialization done!\n", "");
+    debug("initialization done!", "");
 
     /* --- MAIN LOOP --- */
 
