@@ -44,7 +44,7 @@
 #define SLEEP_TIMEOUT 30
 
 /* wifi constants */
-#define USE_WIFI 1
+#define USE_WIFI 0
 #define USE_NTP 1
 #define MAX_CONN_TRIES 10
 #define RECON_TIMEOUT 5
@@ -283,6 +283,8 @@ uint16_t get_max_days_in_month(uint8_t month, uint16_t year) {
 #define sign(int) (int > 0 ? 1 : -1)
 
 /* --- CALLBACKS --- */
+void state_machine();
+
 void wake_up() {
     //lcd_reset();
     lcd_refresh_on_timer();
@@ -296,7 +298,7 @@ void btn_left() {
         //change value down by ? amount
         //něco by mohlo být změněno potíkem něco čudlíky
         change_var(changing_var_at_state, VALUE_DOWN);
-    }
+    } else state_machine();
 }
 
 void btn_right() {
@@ -305,14 +307,15 @@ void btn_right() {
         //change value down by ? amount
         //něco by mohlo být změněno potíkem něco čudlíky
         change_var(changing_var_at_state, VALUE_UP);
-    }
+    } else state_machine();
 }
 
 void btn_enter() {
     next_action = NA_ENTER;
     if(changing_var_at_state != S_SLEEP) {
         change_var(changing_var_at_state, VALUE_OK);
-    }
+    } 
+    if(changing_var_at_state != S_VAR_CHANGE)  state_machine();
 }
 
 void btn_cancel() {
@@ -320,6 +323,7 @@ void btn_cancel() {
     if(changing_var_at_state != S_SLEEP) {
         change_var(S_SLEEP, VALUE_OK);
     }
+    if(changing_var_at_state != S_VAR_CHANGE) state_machine(); //is this ok?
 }
 
 /* --- PRINTING MENU --- */
@@ -850,26 +854,34 @@ state_t main_loop_step(state_t state) {
     }
     next_action = NA_NONE; // možná dát až po main loop logic?
 
-    static uint32_t timeout = SLEEP_TIMEOUT*1000;
 
-    if(state == next_state && state != S_VAR_CHANGE) {
-        //dekrement sleep timer
-        //if sleep timer <= 0 goto sleep
-        if(timeout <= 0) {
-            //start sleep
-            change_var(S_SLEEP, VALUE_OK);
-            lcd_sleep();
-            next_state = S_SLEEP;
-            //nastavit stav na sleep?
-            /* @todo sleep */
-        } else {
-            timeout -= MAIN_LOOP_REFRESH_TIMER;
-        }
-    } else {
-        timeout = SLEEP_TIMEOUT*1000;
-    }
+
+    // static uint32_t timeout = SLEEP_TIMEOUT*1000;
+    // if(state == next_state && state != S_VAR_CHANGE) {
+    //     //dekrement sleep timer
+    //     //if sleep timer <= 0 goto sleep
+    //     if(timeout <= 0) {
+    //         //start sleep
+    //         change_var(S_SLEEP, VALUE_OK);
+    //         lcd_sleep();
+    //         next_state = S_SLEEP;
+    //         //nastavit stav na sleep?
+    //         /* @todo sleep */
+    //     } else {
+    //         timeout -= MAIN_LOOP_REFRESH_TIMER;
+    //     }
+    // } else {
+    //     timeout = SLEEP_TIMEOUT*1000;
+    // }
+
     state = next_state;
     return state;
+}
+
+void state_machine() {
+    static state_t state = DEFAULT_STATE;
+    state = main_loop_step(state);
+    main_loop_logic(state);
 }
 
 int main() {
@@ -913,7 +925,8 @@ int main() {
         debug("lcd init failed!", "");
         return 1;
     }
-    lcd_string("Hello, world!");
+    lcd_write("lcd ok          ", MENU_LINE);
+    debug("lcd initialized!", "");
 
     t.year = -1;
     t.month = -1;
@@ -932,7 +945,7 @@ int main() {
         .min   = 59,
         .sec   = 00
     };
-
+    
     for(int i = 0; i < NUMBER_OF_PROGRAMS; i++) {
         programs[i].start   = t; 
         programs[i].end     = t2;
@@ -940,6 +953,8 @@ int main() {
         programs[i].temp    = 0;
         programs[i].PTM     = PROG_TIME_MODE_SHOW;
     }
+    lcd_write("programs ok     ", MENU_LINE);
+    debug("programs initialized!", "");
 
 #if USE_WIFI
 
@@ -951,35 +966,43 @@ int main() {
 
     cyw43_arch_enable_sta_mode();
 
+    lcd_write("connecting wifi ", MENU_LINE);
+    debug("connecting to wifi!", "");
+
     int err_code = -1;
+    char status_str[MAX_CONN_TRIES+1] = {0};
 
     for(int i = 0; i < MAX_CONN_TRIES; i++) {
         err_code = cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 10000);
-        if(err_code) {
-            debug("failed to connect to wifi - code %d", err_code);
-            sleep_ms(1000*RECON_TIMEOUT+ rand()%1000);
-        } else break;
+        if(!err_code) break;
+        debug("failed to connect to wifi - code %d", err_code);
+        sleep_ms(1000*RECON_TIMEOUT+ rand()%1000);
+        status_str[i] = '.';
+        lcd_write(&status_str[0], STATUS_LINE);
     }
+    lcd_write("                ", STATUS_LINE);
 
     if(err_code) {
         debug("max connection attempts reached", "");
         cyw43_arch_deinit();
         return err_code;
     }
+    lcd_write("wifi ok         ", MENU_LINE);
+    debug("connected to wifi!", "");
 
     busy_wait_ms(600);
 
 #if USE_NTP 
 
-    debug("probing ntp", "");
+    lcd_write("waiting for ntp ", MENU_LINE);
+    debug("probing ntp!", "");
 
     struct tm ntp_time;
 
     run_ntp(&ntp_time);
-
+    debug("got time from ntp!", "");
 
     time_t mkt = mktime(&ntp_time);
-
 
     if(!time_to_datetime(mkt, &t)) {
         debug("time conversion error (time_t to datetime_t)", "");
@@ -987,8 +1010,10 @@ int main() {
         return 1;
     }
 
-
     rtc_set_datetime(&t);
+
+    lcd_write("time ok", MENU_LINE);
+    debug("set time to rtc!", "");
 
 #endif
 
@@ -998,30 +1023,34 @@ int main() {
 
 #endif
 
+
+    changing_var_at_state = S_VAR_CHANGE; //state machine will not change
     btn_set_common_function(&wake_up);
     init_btn_rising_edge(BTN_1_GPIO, &btn_left);
     init_btn_rising_edge(BTN_2_GPIO, &btn_right);
     init_btn_rising_edge(BTN_3_GPIO, &btn_enter);
     init_btn_rising_edge(BTN_4_GPIO, &btn_cancel);
 
+    lcd_write("buttons ok", MENU_LINE);
+    debug("button initialization ok!", "");
+
     busy_wait_ms(200);
     lcd_clear();
     debug("initialization done!", "");
+    busy_wait_ms(200);
+    
+    next_action = DEFAULT_NEXT_ACTION;
+    changing_var_at_state = S_SLEEP;
+    state_machine(); //first step of state machine
 
     /* --- MAIN LOOP --- */
 
-    // @todo čekat ve smyčce dokud není zmáčknut čudlík? << nebo přímo uspat?
-    state_t state = DEFAULT_STATE;
-    next_action = DEFAULT_NEXT_ACTION;
     while (true) {
 
-        state = main_loop_step(state);
-
-        main_loop_logic(state);
+        // @todo kontrola programů zda některý z nich není aktivní?
+        // @todo hlídání teploty
 
         sleep_ms(MAIN_LOOP_REFRESH_TIMER);
-
-        //debug("main loop end, state: %i\n", state);
     }
 }
 

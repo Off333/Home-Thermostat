@@ -1,5 +1,6 @@
 *BUGS*:
  - @bug Tlačítka nemají hlídání na odrazy
+ - @bug displej se neuspí správně
 
 **TODO**: 
 
@@ -35,7 +36,9 @@ krabička pro termostat
  - zapnutí/vypnutí termostatu?
  - otvory pro indikační ledky?
 
-výpis co se děje při inicializaci zařízení na obrazovku
+✓ výpis co se děje při inicializaci zařízení na obrazovku
+
+když se něco mění, tak přidat kolem znak, že se ukazuje měněná hodnota (jako u změny časů)
 
 vypnutí/zapnutí potenciometru, když není potřeba
 vypnutí/zapnutí teploměru, aby nemusel měřit když nemusí
