@@ -38,10 +38,10 @@
 #include "wifi_psswd.h"
 
 /* main loop sleep interval in miliseconds from end of loop to start of next loop */
-#define MAIN_LOOP_REFRESH_TIMER 1000
+#define MAIN_LOOP_REFRESH_TIMER 1000 * 5
 
 /* timeout in seconds, after which the device will go to sleep */
-#define SLEEP_TIMEOUT 30
+//#define SLEEP_TIMEOUT 30
 
 /* wifi constants */
 #define USE_WIFI 0
@@ -50,9 +50,9 @@
 #define RECON_TIMEOUT 5
 
 /* temperature limits in °C */
-#define TEMPERATURE_SET_MIN 15
+#define TEMPERATURE_SET_MIN 150
 
-#define TEMPERATURE_SET_MAX 30
+#define TEMPERATURE_SET_MAX 300
 
 #define DEFAULT_TEMPERATURE_HYSTERESIS 20
 #define HYSTERESIS_MIN 04
@@ -83,6 +83,7 @@ typedef enum {
     S_SETN_TIME,
     S_SETN_HYST,
     S_SETN_OFF,
+    S_SETN_MIN_TEMP,
     S_VAR_CHANGE,
 
     STATE_T_MAX
@@ -118,9 +119,10 @@ static const state_t state_table[STATE_T_MAX][NEXT_ACTION_T_MAX] = {
 /*S_PROG_TIME_SET*/     {S_PROG_TIME_SET,       S_PROG_TEMP_SET,    S_PROG_WEEKDAY_SET, S_VAR_CHANGE,       S_PROG_SEL},
 /*S_PROG_WEEKDAY_SET*/  {S_PROG_WEEKDAY_SET,    S_PROG_TIME_SET,    S_PROG_TEMP_SET,    S_VAR_CHANGE,       S_PROG_SEL},
 /*S_PROG_TEMP_SET*/     {S_PROG_TEMP_SET,       S_PROG_WEEKDAY_SET, S_PROG_TIME_SET,    S_VAR_CHANGE,       S_PROG_SEL},
-/*S_SETN_TIME*/         {S_SETN_TIME,           S_SETN_OFF,         S_SETN_HYST,        S_VAR_CHANGE,       S_MENU_SETN},
+/*S_SETN_TIME*/         {S_SETN_TIME,           S_SETN_MIN_TEMP,    S_SETN_HYST,        S_VAR_CHANGE,       S_MENU_SETN},
 /*S_SETN_HYST*/         {S_SETN_HYST,           S_SETN_TIME,        S_SETN_OFF,         S_VAR_CHANGE,       S_MENU_SETN},
-/*S_SETN_OFF*/          {S_SETN_OFF,            S_SETN_HYST,        S_SETN_TIME,        S_VAR_CHANGE,       S_MENU_SETN},
+/*S_SETN_OFF*/          {S_SETN_OFF,            S_SETN_HYST,        S_SETN_MIN_TEMP,    S_VAR_CHANGE,       S_MENU_SETN},
+/*S_SETN_MIN_TEMP*/     {S_SETN_MIN_TEMP,       S_SETN_OFF,         S_SETN_TIME,        S_VAR_CHANGE,       S_MENU_SETN},
 /*S_VAR_CHANGE*/        {S_VAR_CHANGE,          S_VAR_CHANGE,       S_VAR_CHANGE,       S_VAR_CHANGE,       DEFAULT_STATE}, //místo default state se změní stav na předchozí, který se měnil ( je uložený v chaning_var_at_state)
 };
 
@@ -140,6 +142,7 @@ static const char menu_texts[][LCD_MAX_CHARS+1] = {
         "zmenit cas      ",  //S_SETN_TIME
         "zmenit hysterezi",  //S_SETN_HYST
         "udrzovani teplot",  //S_SETN_OFF
+        "minimalni teplo ",  //S_SETN_MIN_TEMP
         ""                   //S_VAR_CHANGE - special use for empty string to not replace previous value
 #else
         "                ",  //S_SLEEP
@@ -154,6 +157,7 @@ static const char menu_texts[][LCD_MAX_CHARS+1] = {
         "set device time ",  //S_SETN_TIME
         "set hysteresis  ",  //S_SETN_HYST
         "regulate temps. ",  //S_SETN_OFF
+        "minimal temp    ",  //S_SETN_MIN_TEMP
         ""                   //S_VAR_CHANGE - special use for empty string to not replace previous value
 #endif
     };
@@ -179,6 +183,7 @@ typedef enum {
 typedef struct{
     bool temp_regulation_on;
     uint16_t hysteresis;
+    uint16_t min_temp;
 
     setn_time_mode STM; //special variable for showing which part of time in settings is changing
 } thermo_settings_t;
@@ -187,6 +192,7 @@ typedef struct{
 thermo_settings_t th_set = {
     .temp_regulation_on = true,
     .hysteresis = DEFAULT_TEMPERATURE_HYSTERESIS,
+    .min_temp = TEMPERATURE_SET_MIN,
     .STM = SETN_TIME_MODE_SHOW
 };
 //*time is stored in RTC
@@ -223,7 +229,6 @@ typedef struct{
     datetime_t  end;
     uint16_t    temp;
     uint8_t     days;
-    uint8_t     enabled;
     
     program_time_mode PTM; //special variable for showing which part of time in program is changing
 } program_t;
@@ -281,6 +286,9 @@ uint16_t get_max_days_in_month(uint8_t month, uint16_t year) {
 
 //will not work correctly for int == 0
 #define sign(int) (int > 0 ? 1 : -1)
+
+//convert day of the week from datetime_t to internal dotw format
+#define convert_dotw(day) (0b1<<((day+6)%7))
 
 /* --- CALLBACKS --- */
 void state_machine();
@@ -515,10 +523,10 @@ void show_prog_weekday(uint8_t days) {
 }
 
 // formát: TT.T C
-void show_prog_temp(uint16_t temp) {
-    static char temp_str[LCD_MAX_CHARS+1];
+// void show_prog_temp(uint16_t temp) {
+//     static char temp_str[LCD_MAX_CHARS+1];
     
-}
+// }
 
 void show_setn_reg_state(bool state) {
     static char temp_str[LCD_MAX_CHARS+1];
@@ -591,6 +599,10 @@ void update_status(state_t state, program_t* program, thermo_settings_t* setting
 
         case S_SETN_OFF:
             show_setn_reg_state(settings->temp_regulation_on);
+            break;
+        
+        case S_SETN_MIN_TEMP:
+            show_temperature(settings->min_temp);
             break;
 
         // case S_VAR_CHANGE:
@@ -730,8 +742,8 @@ void change_var(state_t var, int16_t dir) {
             if(dir) {
                 //I can use max and min pro standard math library...
                 temp_program.temp = temp_program.temp + dir;
-                if(temp_program.temp < TEMPERATURE_SET_MIN*10) temp_program.temp = TEMPERATURE_SET_MIN*10;
-                else if(temp_program.temp > TEMPERATURE_SET_MAX*10) temp_program.temp = TEMPERATURE_SET_MAX*10;
+                if(temp_program.temp < TEMPERATURE_SET_MIN) temp_program.temp = TEMPERATURE_SET_MIN;
+                else if(temp_program.temp > TEMPERATURE_SET_MAX) temp_program.temp = TEMPERATURE_SET_MAX;
             } else { //Save
                 //I hope no validation si needed
                 programs[selected_program].temp = temp_program.temp;
@@ -793,6 +805,18 @@ void change_var(state_t var, int16_t dir) {
                 next_action = NA_ESC;
             }
             break;
+        case S_SETN_MIN_TEMP:
+            if(dir) {
+                //I can use max and min pro standard math library...
+                temp_setn.min_temp = temp_setn.min_temp + dir;
+                if(temp_setn.min_temp < TEMPERATURE_SET_MIN) temp_setn.min_temp = TEMPERATURE_SET_MIN;
+                else if(temp_setn.min_temp > TEMPERATURE_SET_MAX) temp_setn.min_temp = TEMPERATURE_SET_MAX;
+            } else { //Save
+                th_set.min_temp = temp_setn.min_temp;
+                previous_var = S_SLEEP;
+                next_action = NA_ESC;
+            }
+            break;
     }
 
     //update the value on display 
@@ -801,9 +825,12 @@ void change_var(state_t var, int16_t dir) {
 
 /* set temperature will be center of HYSTERESIS curve */
 void check_relay_state(float current_temp, float set_temp) {
+    debug("checking relay state %f %f", current_temp, set_temp);
     if(current_temp > set_temp + th_set.hysteresis/20) {
+        debug("relay off", "");
         relay_off();
     } else if(current_temp < set_temp - th_set.hysteresis/20) {
+        debug("relay on", "");
         relay_on();
     }
 }
@@ -811,19 +838,13 @@ void check_relay_state(float current_temp, float set_temp) {
 /* --- READ FUNCTIONS --- */
 
 float get_temp_threshold() {
-    return TEMPERATURE_SET_MIN + (TEMPERATURE_SET_MAX-TEMPERATURE_SET_MIN)*((100-get_pot_val())/100.0f);
+    return TEMPERATURE_SET_MIN/10 + (TEMPERATURE_SET_MAX-TEMPERATURE_SET_MIN)*((100-get_pot_val())/1000.0f);
 }
 
 /* --- MAIN LOOP FUNCTIONS --- */
 
 
 void main_loop_logic(state_t state) {
-
-    //if temperature regulation is on
-    if(th_set.temp_regulation_on) {
-        /* @todo get_temp_threshold byl měl brát teplotu ze struktury programů */
-        check_relay_state(convert_temp_to_float(get_temp()), get_temp_threshold());
-    }
 
     //je důležité pořadí?
     update_status(state, &(programs[selected_program]), &th_set);
@@ -882,6 +903,47 @@ void state_machine() {
     static state_t state = DEFAULT_STATE;
     state = main_loop_step(state);
     main_loop_logic(state);
+}
+
+void regulate_temps() {
+
+    debug("regulating temperature", "");
+
+    // @todo kontrola programů zda některý z nich není aktivní?
+    // @todo hlídání teploty
+    datetime_t current_time;
+    rtc_get_datetime(&current_time);
+
+    uint8_t dotw = convert_dotw(current_time.dotw);
+
+    uint16_t temp = th_set.min_temp;
+
+    for(uint8_t i = 0; i < NUMBER_OF_PROGRAMS; i++) {
+        program_t p = programs[i];
+        debug("prog %d dotw %d, start h %d min %d end h %d min %d",
+            i,
+            p.days & dotw, 
+            current_time.hour >= p.start.hour, 
+            current_time.min >= p.start.min, 
+            current_time.hour <= p.end.hour, 
+            current_time.min <= p.end.min);
+
+        if(
+            p.days & dotw &&
+            current_time.hour >= p.start.hour &&
+            current_time.min >= p.start.min &&
+            current_time.hour <= p.end.hour &&
+            current_time.min <= p.end.min
+        ) {
+            temp = p.temp;
+            debug("program %d on!", i);
+            break;
+        }
+    }
+
+
+    /* @todo get_temp_threshold byl měl brát teplotu ze struktury programů */
+    check_relay_state(convert_temp_to_float(get_temp()), convert_temp_to_float(temp));
 }
 
 int main() {
@@ -950,7 +1012,7 @@ int main() {
         programs[i].start   = t; 
         programs[i].end     = t2;
         programs[i].days    = NEVER;
-        programs[i].temp    = 0;
+        programs[i].temp    = TEMPERATURE_SET_MIN;
         programs[i].PTM     = PROG_TIME_MODE_SHOW;
     }
     lcd_write("programs ok     ", MENU_LINE);
@@ -1046,28 +1108,11 @@ int main() {
     /* --- MAIN LOOP --- */
 
     while (true) {
-
-        // @todo kontrola programů zda některý z nich není aktivní?
-        // @todo hlídání teploty
-
+        //if temperature regulation is on
+        if(th_set.temp_regulation_on) {
+            regulate_temps();
+        }
+        state_machine();
         sleep_ms(MAIN_LOOP_REFRESH_TIMER);
     }
 }
-
-
-/* @deprecated old test function */
-// void show_temp_data(uint16_t temp, float temp_threshold) {
-//     char temp_str[6];
-//     char write_str[17];
-
-//     if(temp >= 0 && temp < 1000) {
-//         convert_temp_to_str(temp, temp_str);
-//         sniprintf(write_str, 16, "T. namer: %s", temp_str);
-//         lcd_write(write_str, LCD_LINE_1);
-//     }
-
-//     if(temp_threshold >= TEMPERATURE_SET_MIN && temp_threshold <= TEMPERATURE_SET_MAX) {
-//         sprintf(write_str, "T.  udrz: %2.1f", temp_threshold);
-//         lcd_write(write_str, LCD_LINE_2);
-//     }
-// }

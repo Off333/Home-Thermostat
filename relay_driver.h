@@ -10,6 +10,8 @@
 #ifndef RELAY_DRIVER_H
 #define RELAY_DRIVER_H
 
+#define RELAY_PIN 0
+
 void relay_init();
 
 void relay_set(bool state);

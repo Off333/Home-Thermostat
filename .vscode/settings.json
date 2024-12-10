@@ -43,6 +43,7 @@
         "button_driver.h": "c",
         "sync.h": "c",
         "cstdio": "cpp",
-        "debug.h": "c"
+        "debug.h": "c",
+        "limits": "c"
     }
 }

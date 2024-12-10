@@ -7,34 +7,39 @@
 ✓ přidat state machine
 
 logika termostatu
- - rtc alarmy
+ - X rtc alarmy
  - ✓ nastavení různé teploty na různé časy
     - ✓ struktura pro ukládání
-    - hlídání těchto časů přes alarmy
-        - jak lze udělat křivky? -> například postupně po 5 minutách měnit podle grafu křivky(funkce)
+    - X hlídání těchto časů přes alarmy
+    - ✓ hlídání časů programů periodicky po X minutách (uspání v hlavní smyčce)
+ - ukládání programů a nastavení do flash paměti 
 
 menu a ovládání
  - ✓ nastavení teplot
  - ✓ nastavitelná hystereze teploty 
  - ✓ základní nastavení
- - vypnutí/zapnutí webserveru?
+ - X vypnutí/zapnutí webserveru?
+ - program, který se připojí a zapíše jen několik bytů nemusí být řešen přes webserver
+   - komunikační protokol
+   - webová aplikace (může být webová stránka s javaskriptem > zařízení z POST požadavku vyjme co potřebuje > zabezpečení?)
  - ✓ úplné pozastavení hlídání teploty?
  - ovládání pomocí potíku
 
-refresh pouze pokud je zmáčknuto tlačítko
+✓ refresh pouze pokud je zmáčknuto tlačítko
  - jediný problém je zobrazení reálného času... tam je asi možno refresh po 1s... jinak by se měl main loop proběhnout jen 1x za dlouhou dobu... třeba 5 min a hlídat teplotu
+ - vyřešeno updatem state machine v rámci hlavní smyčky... není dokonalé, ale nemusí být
 
 wifi
  - ✓ připojení
  - ✓ ntp
- - jednoduchý web server (bude aktivní pořád?)
+ - X jednoduchý web server (bude aktivní pořád?)
  - ? nwm jestli deinit odpojí odpojování od wifi?
   
 krabička pro termostat
  - tlačítka a otočný úchyt pro potík
  - obrazovka
  - zapnutí/vypnutí termostatu?
- - otvory pro indikační ledky?
+ - X otvory pro indikační ledky?
 
 ✓ výpis co se děje při inicializaci zařízení na obrazovku
 
@@ -47,6 +52,8 @@ vypnutí/zapnutí teploměru, aby nemusel měřit když nemusí
 kalibrace teploměru (teploměr na pico?)
 
 ukládání a statistika teplot
+
+jak lze udělat křivky? -> například postupně po 5 minutách měnit podle grafu křivky(funkce)
 
 dokumentace a toto readme <!-- <-this -->
 

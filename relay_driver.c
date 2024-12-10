@@ -11,9 +11,6 @@
 
 #include "relay_driver.h"
 
-
-#define RELAY_PIN 15
-
 void relay_init() {
     gpio_init(RELAY_PIN);
 
