@@ -15,8 +15,10 @@
 /* PICO LIBRARIES */
 #include "pico/stdlib.h"
 #include "hardware/rtc.h"
+#include "hardware/flash.h"
 #include "pico/util/datetime.h"
 #include "pico/cyw43_arch.h"
+#include "pico/flash.h"
 
 #include "lwip/dns.h"
 #include "lwip/pbuf.h"
@@ -84,8 +86,10 @@ typedef enum {
     S_SETN_HYST,
     S_SETN_OFF,
     S_SETN_MIN_TEMP,
-    S_VAR_CHANGE,
+    S_SETN_SAVE,
+    S_SETN_LOAD,
 
+    S_VAR_CHANGE,
     STATE_T_MAX
 } state_t;
 
@@ -119,10 +123,12 @@ static const state_t state_table[STATE_T_MAX][NEXT_ACTION_T_MAX] = {
 /*S_PROG_TIME_SET*/     {S_PROG_TIME_SET,       S_PROG_TEMP_SET,    S_PROG_WEEKDAY_SET, S_VAR_CHANGE,       S_PROG_SEL},
 /*S_PROG_WEEKDAY_SET*/  {S_PROG_WEEKDAY_SET,    S_PROG_TIME_SET,    S_PROG_TEMP_SET,    S_VAR_CHANGE,       S_PROG_SEL},
 /*S_PROG_TEMP_SET*/     {S_PROG_TEMP_SET,       S_PROG_WEEKDAY_SET, S_PROG_TIME_SET,    S_VAR_CHANGE,       S_PROG_SEL},
-/*S_SETN_TIME*/         {S_SETN_TIME,           S_SETN_MIN_TEMP,    S_SETN_HYST,        S_VAR_CHANGE,       S_MENU_SETN},
+/*S_SETN_TIME*/         {S_SETN_TIME,           S_SETN_LOAD,        S_SETN_HYST,        S_VAR_CHANGE,       S_MENU_SETN},
 /*S_SETN_HYST*/         {S_SETN_HYST,           S_SETN_TIME,        S_SETN_OFF,         S_VAR_CHANGE,       S_MENU_SETN},
 /*S_SETN_OFF*/          {S_SETN_OFF,            S_SETN_HYST,        S_SETN_MIN_TEMP,    S_VAR_CHANGE,       S_MENU_SETN},
-/*S_SETN_MIN_TEMP*/     {S_SETN_MIN_TEMP,       S_SETN_OFF,         S_SETN_TIME,        S_VAR_CHANGE,       S_MENU_SETN},
+/*S_SETN_MIN_TEMP*/     {S_SETN_MIN_TEMP,       S_SETN_OFF,         S_SETN_SAVE,        S_VAR_CHANGE,       S_MENU_SETN},
+/*S_SETN_SAVE*/         {S_SETN_SAVE,           S_SETN_MIN_TEMP,    S_SETN_LOAD,        S_SETN_SAVE,        S_MENU_SETN},
+/*S_SETN_LOAD*/         {S_SETN_LOAD,           S_SETN_SAVE,        S_SETN_TIME,        S_SETN_LOAD,        S_MENU_SETN},
 /*S_VAR_CHANGE*/        {S_VAR_CHANGE,          S_VAR_CHANGE,       S_VAR_CHANGE,       S_VAR_CHANGE,       DEFAULT_STATE}, //místo default state se změní stav na předchozí, který se měnil ( je uložený v chaning_var_at_state)
 };
 
@@ -143,6 +149,8 @@ static const char menu_texts[][LCD_MAX_CHARS+1] = {
         "zmenit hysterezi",  //S_SETN_HYST
         "udrzovani teplot",  //S_SETN_OFF
         "minimalni teplo ",  //S_SETN_MIN_TEMP
+        "ulozit nastaveni",  //S_SETN_SAVE
+        "nacist nastaveni",  //S_SETN_LOAD
         ""                   //S_VAR_CHANGE - special use for empty string to not replace previous value
 #else
         "                ",  //S_SLEEP
@@ -158,6 +166,8 @@ static const char menu_texts[][LCD_MAX_CHARS+1] = {
         "set hysteresis  ",  //S_SETN_HYST
         "regulate temps. ",  //S_SETN_OFF
         "minimal temp    ",  //S_SETN_MIN_TEMP
+        "save settings   ",  //S_SETN_SAVE
+        "load settings   ",  //S_SETN_LOAD
         ""                   //S_VAR_CHANGE - special use for empty string to not replace previous value
 #endif
     };
@@ -604,7 +614,6 @@ void update_status(state_t state, program_t* program, thermo_settings_t* setting
         case S_SETN_MIN_TEMP:
             show_temperature(settings->min_temp);
             break;
-
         // case S_VAR_CHANGE:
         //     break;
         default:
@@ -841,6 +850,117 @@ float get_temp_threshold() {
     return TEMPERATURE_SET_MIN/10 + (TEMPERATURE_SET_MAX-TEMPERATURE_SET_MIN)*((100-get_pot_val())/1000.0f);
 }
 
+/* --- FLASH WRITE/READ FUNCTIONS --- */
+//https://github.com/raspberrypi/pico-examples/blob/master/flash/program/flash_program.c
+//tohle půjde stejně do vlastního souboru tohle je jen pro @test
+typedef struct{
+    uint16_t min_temp;
+    uint16_t hysteresis;
+    uint8_t  flags; // -|-|-|-|-|-|-|ON/OFF
+} thermo_settings_flash_t;
+
+typedef struct{
+    uint16_t start;
+    uint16_t end;
+    uint16_t temp;
+    uint8_t  days;
+} program_flash_t;
+
+static_assert(sizeof(thermo_settings_flash_t)+NUMBER_OF_PROGRAMS*sizeof(program_flash_t) <= FLASH_PAGE_SIZE);
+#define FLASH_TARGET_OFFSET (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
+const uint8_t* flash_target = (const uint8_t*)(XIP_BASE + FLASH_TARGET_OFFSET);
+bool FLASH_CLEARED = false;
+
+/**
+ * 
+ * NOT SAFE!
+ */
+static void flash_erase(void* target) {
+    uint32_t offset = (uint32_t)target;
+    flash_range_erase(offset, FLASH_SECTOR_SIZE);
+}
+
+/**
+ * 
+ * NOT SAFE!
+ */
+static void flash_program(void* target) {
+    uint32_t offset  = ((uintptr_t*)target)[0];
+    const uint8_t* data = (const uint8_t*)((uintptr_t*)target)[1];
+    flash_range_program(offset, data, FLASH_PAGE_SIZE);
+}
+
+int flash_erase_safe() {
+    //místo hard assertu vrátit chybu 
+    hard_assert(flash_safe_execute(flash_erase, (void*)FLASH_TARGET_OFFSET, UINT32_MAX) == PICO_OK);
+    FLASH_CLEARED = true;
+    return 0;
+}
+
+int flash_program_safe(uint8_t* buf, size_t buf_len) {
+    uint8_t data[FLASH_PAGE_SIZE] = {0};
+    memcpy(&data, buf, buf_len);
+    uintptr_t params[] = {FLASH_TARGET_OFFSET, (uintptr_t)data};
+    //místo hard assertu vrátit chybu 
+    hard_assert(flash_safe_execute(flash_program, params, UINT32_MAX) == PICO_OK);
+    FLASH_CLEARED = false;
+    bool mismatch = false;
+    for(uint i = 0; i < buf_len; ++i) {
+        if(buf[i] != flash_target[i]) return 1;
+    }
+    return 0;
+}
+
+#define datetime_to_uint8_t(datetime) ((((uint16_t)datetime.hour) << 8) | ((uint16_t)datetime.min))
+
+void save_settings() {
+    if(flash_erase_safe()) return; // zde by mělo být chybové hlášení @todo
+    uint8_t data[sizeof(thermo_settings_flash_t)+NUMBER_OF_PROGRAMS*sizeof(program_flash_t)];
+    uint8_t *(data_pntr) = data;
+    thermo_settings_flash_t temp_settings = {
+        .min_temp = th_set.min_temp,
+        .hysteresis = th_set.hysteresis,
+        .flags = th_set.temp_regulation_on
+    };
+    memcpy(data_pntr, &temp_settings, sizeof(thermo_settings_flash_t));
+    data_pntr += sizeof(thermo_settings_flash_t);
+    program_flash_t temp_prog;
+    for(uint i = 0; i < NUMBER_OF_PROGRAMS; ++i) {
+        temp_prog.start = datetime_to_uint8_t(programs[i].start);
+        temp_prog.end   = datetime_to_uint8_t(programs[i].end);
+        temp_prog.temp  = programs[i].temp;
+        temp_prog.days  = programs[i].days;
+        memcpy(data_pntr, &temp_prog, sizeof(program_flash_t));
+        data_pntr += sizeof(program_flash_t);
+    }
+    if(flash_program_safe(data, sizeof(data))) debug("ERROR - FLASH PROGRAMMING FAILED", "");
+    else lcd_write("OK", STATUS_LINE);
+}
+
+void load_settings() {
+    if(FLASH_CLEARED) return; // zde by mělo být chybové hlášení @todo
+    uint8_t* data_pntr = (uint8_t*)flash_target;
+    thermo_settings_flash_t temp_settings;
+    memcpy(&temp_settings, data_pntr, sizeof(thermo_settings_flash_t));
+    th_set.min_temp           = temp_settings.min_temp;
+    th_set.hysteresis         = temp_settings.hysteresis;
+    th_set.temp_regulation_on = temp_settings.flags << 7;
+    data_pntr += sizeof(thermo_settings_flash_t);
+    program_flash_t temp_prog;
+    for(uint i = 0; i < NUMBER_OF_PROGRAMS; ++i) {
+        memcpy(&temp_prog, data_pntr, sizeof(program_flash_t));
+        programs[i].start.hour = (temp_prog.start >> 8);
+        programs[i].start.min = (temp_prog.start << 8) >> 8;
+        programs[i].end.hour = (temp_prog.end >> 8);
+        programs[i].end.min = (temp_prog.end << 8) >> 8;
+        programs[i].temp = temp_prog.temp;
+        programs[i].days = temp_prog.days;
+        data_pntr += sizeof(program_flash_t);
+    }
+    lcd_write("OK", STATUS_LINE);
+}
+
+
 /* --- MAIN LOOP FUNCTIONS --- */
 
 
@@ -854,6 +974,8 @@ void main_loop_logic(state_t state) {
 state_t main_loop_step(state_t state) {
     state_t next_state = state_table[state][next_action];
     debug("state: %d next_state: %d action: %d s_var_change: %d", state, next_state, next_action, changing_var_at_state);
+
+    //@TODO tohle asi předělat na switch... začíná to být nečitelné
 
     //changing variable
     if(next_state == S_VAR_CHANGE && state != S_VAR_CHANGE) {
@@ -872,6 +994,12 @@ state_t main_loop_step(state_t state) {
         selected_program = (NUMBER_OF_PROGRAMS+selected_program+1) % NUMBER_OF_PROGRAMS;
     } else if(state != S_SLEEP && next_state == S_SLEEP) {
         lcd_sleep();
+    } else if(state == S_SETN_SAVE && next_action == NA_ENTER) {
+        save_settings();
+    } else if(state == S_SETN_LOAD && next_action == NA_ENTER) {
+        load_settings();
+    } else if (next_state == S_SETN_SAVE || next_state == S_SETN_LOAD) {
+        lcd_write("                ", STATUS_LINE); //tohle by tu nemělo být... ale nwm jak to udělat lépe, aby se zobrazovalo to ok? ... hmm @TODO
     }
     next_action = NA_NONE; // možná dát až po main loop logic?
 

@@ -67,9 +67,11 @@ target_link_libraries(Thermostat
         hardware_adc
         hardware_rtc
         hardware_sync
+        hardware_flash
         pico_sync
         pico_cyw43_arch_lwip_threadsafe_background
         pico_util
+        pico_flash
         )
 
 

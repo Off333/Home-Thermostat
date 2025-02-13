@@ -1,3 +1,5 @@
+
+
 *BUGS*:
  - @bug Tlačítka nemají hlídání na odrazy
  - @bug displej se neuspí správně
@@ -6,22 +8,19 @@
 
 ✓ přidat state machine
 
-logika termostatu
+✓ logika termostatu
  - X rtc alarmy
  - ✓ nastavení různé teploty na různé časy
     - ✓ struktura pro ukládání
     - X hlídání těchto časů přes alarmy
     - ✓ hlídání časů programů periodicky po X minutách (uspání v hlavní smyčce)
- - ukládání programů a nastavení do flash paměti 
+ - ✓ ukládání programů a nastavení do flash paměti 
 
 menu a ovládání
  - ✓ nastavení teplot
  - ✓ nastavitelná hystereze teploty 
  - ✓ základní nastavení
  - X vypnutí/zapnutí webserveru?
- - program, který se připojí a zapíše jen několik bytů nemusí být řešen přes webserver
-   - komunikační protokol
-   - webová aplikace (může být webová stránka s javaskriptem > zařízení z POST požadavku vyjme co potřebuje > zabezpečení?)
  - ✓ úplné pozastavení hlídání teploty?
  - ovládání pomocí potíku
 
@@ -34,6 +33,9 @@ wifi
  - ✓ ntp
  - X jednoduchý web server (bude aktivní pořád?)
  - ? nwm jestli deinit odpojí odpojování od wifi?
+ - program, který se připojí a zapíše jen několik bytů nemusí být řešen přes webserver
+   - komunikační protokol
+   - webová aplikace (může být webová stránka s javaskriptem > zařízení z POST požadavku vyjme co potřebuje > zabezpečení?)
   
 krabička pro termostat
  - tlačítka a otočný úchyt pro potík
@@ -43,8 +45,13 @@ krabička pro termostat
 
 ✓ výpis co se děje při inicializaci zařízení na obrazovku
 
+změna teplotního senzoru z LM35DZ(analog) na DHT22(digital)
+
+přesunout konstanty do samostatného hlavičkového souboru 
+
 když se něco mění, tak přidat kolem znak, že se ukazuje měněná hodnota (jako u změny časů)
 
+(úplně oddělat potík pryč, pokud ho nebudu používat)
 vypnutí/zapnutí potenciometru, když není potřeba
 vypnutí/zapnutí teploměru, aby nemusel měřit když nemusí
  - pokud se teplota hlídá co 3 minuty tak není potřeba vědět teplotu každé 2 sekundy
@@ -55,7 +62,8 @@ ukládání a statistika teplot
 
 jak lze udělat křivky? -> například postupně po 5 minutách měnit podle grafu křivky(funkce)
 
-dokumentace a toto readme <!-- <-this -->
+dokumentace 
+toto readme
 
 Relevantní odkazy:
  - https://forums.raspberrypi.com/viewtopic.php?t=339289
@@ -69,3 +77,4 @@ Relevantní odkazy:
  - https://www.instructables.com/Arduino-Thermostat/
  - https://dzone.com/articles/how-to-build-your-own-arduino-thermostat
  - https://moniteurdevices.com/knowledgebase/knowledgebase/what-is-the-difference-between-spst-spdt-and-dpdt/
+ - https://www.makermatrix.com/blog/read-and-write-data-with-the-pi-pico-onboard-flash/
