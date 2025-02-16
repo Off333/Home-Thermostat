@@ -15,6 +15,7 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 #include "pico/stdlib.h"
 #include "pico/malloc.h"
 #include "pico/critical_section.h"
@@ -22,6 +23,9 @@
 #include "hardware/i2c.h"
 #include "hardware/sync.h"
 #include "hardware/rtc.h"
+
+#define DEBUG 1
+#include "debug.h"
 
 #include "lcd.h"
 
@@ -155,7 +159,8 @@ void lcd_display_enable(bool enable) {
 }
 
 void lcd_write(const char *s, uint line) {
-    if(line < 0 || line >= LCD_MAX_LINES) return;
+    if(line < 0 || line >= LCD_MAX_LINES || !strlen(s)) return;
+    debug("writing %s on line %d", s, line);
     critical_section_enter_blocking(&write_cs);
     snprintf(lcd_buffered_string[line], LCD_MAX_CHARS+1, "%s", s);
     critical_section_exit(&write_cs);

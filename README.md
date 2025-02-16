@@ -45,7 +45,9 @@ krabička pro termostat
 
 ✓ výpis co se děje při inicializaci zařízení na obrazovku
 
-změna teplotního senzoru z LM35DZ(analog) na DHT22(digital)
+✓ změna teplotního senzoru z LM35DZ(analog) na DHT22(digital)
+
+výpis vlhkosti (vedle teploty?)
 
 přesunout konstanty do samostatného hlavičkového souboru 
 
@@ -59,6 +61,8 @@ vypnutí/zapnutí teploměru, aby nemusel měřit když nemusí
 kalibrace teploměru (teploměr na pico?)
 
 ukládání a statistika teplot
+
+změnit všechny více-řádkové komentáře na jednořádkové (něco okolo good practice ve psaní kódu pro hardware) > najít/nainstalovat modul, který hlídá tyto standardy
 
 jak lze udělat křivky? -> například postupně po 5 minutách měnit podle grafu křivky(funkce)
 

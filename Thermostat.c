@@ -14,12 +14,15 @@
 
 /* PICO LIBRARIES */
 #include "pico/stdlib.h"
-#include "hardware/rtc.h"
-#include "hardware/flash.h"
 #include "pico/util/datetime.h"
-#include "pico/cyw43_arch.h"
+#include "hardware/rtc.h"
+
+//flash
+#include "hardware/flash.h"
 #include "pico/flash.h"
 
+//wifi
+#include "pico/cyw43_arch.h"
 #include "lwip/dns.h"
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
@@ -30,9 +33,8 @@
 
 /* MY MODULES */
 #include "lcd.h"
-#include "analog_tmp_sensor.h"
 #include "relay_driver.h"
-#include "potenciometer.h"
+#include "digital_tmp_sensor.h"
 #include "button_driver.h"
 
 //wifi stuff
@@ -136,7 +138,7 @@ static const state_t state_table[STATE_T_MAX][NEXT_ACTION_T_MAX] = {
 static const char menu_texts[][LCD_MAX_CHARS+1] = {
 
 #ifndef LANG_EN
-        "                ",  //S_SLEEP
+        "",  //S_SLEEP
         "<nast|cas |tepl>",  //S_MENU_TIME
         "<cas |tepl|prog>",  //S_MENU_TEMP
         "<tepl|prog|nast>",  //S_MENU_PROGS
@@ -153,7 +155,7 @@ static const char menu_texts[][LCD_MAX_CHARS+1] = {
         "nacist nastaveni",  //S_SETN_LOAD
         ""                   //S_VAR_CHANGE - special use for empty string to not replace previous value
 #else
-        "                ",  //S_SLEEP
+        "",  //S_SLEEP
         "<setn|time|temp>",  //S_MENU_TIME
         "<time|temp|prog>",  //S_MENU_TEMP
         "<temp|prog|setn>",  //S_MENU_PROGS
@@ -555,6 +557,7 @@ void show_setn_reg_state(bool state) {
  * 
  */
 void update_status(state_t state, program_t* program, thermo_settings_t* settings) {
+    debug("updating status", "");
     switch(state) {
         case S_SLEEP:
             //uspat dokud se nevzbudí kvůli libovolného interputu?
@@ -846,9 +849,10 @@ void check_relay_state(float current_temp, float set_temp) {
 
 /* --- READ FUNCTIONS --- */
 
-float get_temp_threshold() {
-    return TEMPERATURE_SET_MIN/10 + (TEMPERATURE_SET_MAX-TEMPERATURE_SET_MIN)*((100-get_pot_val())/1000.0f);
-}
+
+// float get_temp_threshold() {
+//     return TEMPERATURE_SET_MIN/10 + (TEMPERATURE_SET_MAX-TEMPERATURE_SET_MIN)*((100-get_pot_val())/1000.0f);
+// }
 
 /* --- FLASH WRITE/READ FUNCTIONS --- */
 //https://github.com/raspberrypi/pico-examples/blob/master/flash/program/flash_program.c
@@ -1037,8 +1041,6 @@ void regulate_temps() {
 
     debug("regulating temperature", "");
 
-    // @todo kontrola programů zda některý z nich není aktivní?
-    // @todo hlídání teploty
     datetime_t current_time;
     rtc_get_datetime(&current_time);
 
@@ -1048,13 +1050,13 @@ void regulate_temps() {
 
     for(uint8_t i = 0; i < NUMBER_OF_PROGRAMS; i++) {
         program_t p = programs[i];
-        debug("prog %d dotw %d, start h %d min %d end h %d min %d",
+        /*debug("prog %d dotw %d, start h %d min %d end h %d min %d",
             i,
             p.days & dotw, 
             current_time.hour >= p.start.hour, 
             current_time.min >= p.start.min, 
             current_time.hour <= p.end.hour, 
-            current_time.min <= p.end.min);
+            current_time.min <= p.end.min);*/
 
         if(
             p.days & dotw &&
@@ -1064,21 +1066,23 @@ void regulate_temps() {
             current_time.min <= p.end.min
         ) {
             temp = p.temp;
-            debug("program %d on!", i);
+            //debug("program %d on!", i);
             break;
         }
     }
 
 
-    /* @todo get_temp_threshold byl měl brát teplotu ze struktury programů */
-    check_relay_state(convert_temp_to_float(get_temp()), convert_temp_to_float(temp));
+    uint16_t measured_temp = get_temp();
+    if(measured_temp && temp) check_relay_state(convert_temp_to_float(measured_temp), convert_temp_to_float(temp));
 }
 
 int main() {
 
     /* --- INITIALIZATION --- */
-    printf("START\n");
-    busy_wait_ms(2000);
+    for(int i = 0; i < 1; ++i) {
+        printf("START\n");
+        busy_wait_ms(1000); 
+    }
     debug("initialization...", "");
 
     stdio_init_all();
@@ -1087,11 +1091,11 @@ int main() {
         debug("temp sensor init failed!", "");
         return 1;
     }
-
+    /*
     if(pot_init()) {
         debug("potenciometr init failed!", "");
         return 1;
-    }
+    }*/
 
     rtc_init();
 
@@ -1221,13 +1225,13 @@ int main() {
     init_btn_rising_edge(BTN_3_GPIO, &btn_enter);
     init_btn_rising_edge(BTN_4_GPIO, &btn_cancel);
 
-    lcd_write("buttons ok", MENU_LINE);
     debug("button initialization ok!", "");
+    lcd_write("buttons ok", MENU_LINE);
 
-    busy_wait_ms(200);
+    busy_wait_ms(300);
     lcd_clear();
     debug("initialization done!", "");
-    busy_wait_ms(200);
+
     
     next_action = DEFAULT_NEXT_ACTION;
     changing_var_at_state = S_SLEEP;

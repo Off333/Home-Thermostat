@@ -44,6 +44,9 @@
         "sync.h": "c",
         "cstdio": "cpp",
         "debug.h": "c",
-        "limits": "c"
+        "limits": "c",
+        "digital_tmp_sensor.h": "c",
+        "wifi_psswd.h": "c",
+        "adc.h": "c"
     }
 }
